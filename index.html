@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Markdown 习题管理器 - 云端 Vue 版</title>
+    <title>Markdown 习题管理器</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -21,75 +21,117 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f5f5f5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f5f5f5; }
+                
         #toolbar { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: #333; color: white; display: flex; align-items: center; padding: 0 20px; z-index: 100; justify-content: space-between; }
         .toolbar-buttons { display: flex; gap: 10px; }
         #app-container { display: flex; width: 100%; margin-top: 60px; height: calc(100vh - 60px); }
-        #sidebar { width: 250px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; padding: 10px; }
+        
+        /* 侧边栏二级菜单样式 */
+        #sidebar { width: 280px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column;}
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
+        .chapter-box { border-bottom: 1px solid #f0f0f0; }
+        .chapter-title { padding: 10px 15px; background: #fafafa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 15px; }
+        .chapter-title:hover { background: #f0f0f0; }
+        .section-item { padding: 8px 15px 8px 30px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #555; transition: 0.2s;}
+        .section-item:hover { background-color: #e9ecef; }
+        .section-item.active { background-color: #007bff; color: white; }
+        .section-item.active .icon-btn { color: white; }
+        
+        .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; color: #888; padding: 2px 5px; border-radius: 4px;}
+        .icon-btn:hover { background: rgba(0,0,0,0.1); }
+        
         #main-content { flex: 1; padding: 20px; overflow-y: auto; }
         
-        .section-item { padding: 10px; cursor: pointer; border-radius: 4px; margin-bottom: 5px; font-weight: 500;}
-        .section-item:hover { background-color: #f0f0f0; }
-        .section-item.active { background-color: #007bff; color: white; }
-        
-        .question-card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .question-card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative;}
         .question-header { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .editor-container { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;}
-        textarea.md-editor { width: 100%; height: 150px; font-family: monospace; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
+        textarea.md-editor { width: 100%; height: 180px; font-family: monospace; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
         
         .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.2s; }
         .btn:hover { opacity: 0.9; }
+        .btn-primary { background-color: #007bff; color: white; }
         .btn-edit { background-color: #ffc107; color: #333; }
+        .btn-danger { background-color: #dc3545; color: white; }
         .btn-save { background-color: #28a745; color: white; font-weight: bold; }
         .btn-export { background-color: #17a2b8; color: white; font-weight: bold; }
-        .btn-pdf { background-color: #dc3545; color: white; font-weight: bold; }
         .preview-area { min-height: 50px; font-size: 16px; line-height: 1.6; }
     </style>
 </head>
 <body>
     <div id="app">
-        <div id="toolbar">
-            <div id="status-text" style="font-weight: bold; font-size: 16px;">{{ statusText }}</div>
-            <div class="toolbar-buttons">
-                <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出带答案(MD)</button>
-                <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 仅导出题目(MD)</button>
-                <button class="btn btn-pdf" @click="exportPDF(true)">🖨️ 导出带答案(PDF)</button>
-                <button class="btn btn-pdf" @click="exportPDF(false)">🖨️ 仅导出题目(PDF)</button>
-            </div>
-        </div>
 
-        <div id="app-container">
-            <div id="sidebar">
-                <div 
-                    v-for="(chapter, index) in groupedData" 
-                    :key="index"
-                    class="section-item"
-                    :class="{ active: currentChapterIndex === index }"
-                    @click="selectChapter(index)"
-                >
-                    {{ chapter.title }}
+        <div>
+            <div id="toolbar">
+                <div id="status-text" style="font-weight: bold; font-size: 16px;">{{ statusText }}</div>
+                <div class="toolbar-buttons">
+                    <button class="btn btn-primary" @click="resetCredentials">⚙️ 重置凭证</button>
+                    <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出带答案(MD)</button>
+                    <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 仅导出题目(MD)</button>
                 </div>
             </div>
-            
-            <div id="main-content" v-if="currentChapter">
-                <h2>{{ currentChapter.title }}</h2>
-                
-                <div v-for="(q, qIndex) in currentChapter.questions" :key="q.id" class="question-card">
-                    <div class="question-header">
-                        <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
-                        <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 16px;"><strong>加入导出清单</strong></label>
-                        <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ 修正原代码</button>
+
+            <div id="app-container">
+                <div id="sidebar">
+                    <div class="sidebar-header">
+                        题库目录树
+                        <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
                     </div>
                     
-                    <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
-                    
-                    <div class="editor-container" v-show="q.isEditing">
-                        <div style="margin-bottom: 5px;">
-                            <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
-                            <button class="btn" style="background:#6c757d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
-                            <button class="btn btn-save" @click="saveQuestion(q)">💾 保存到云端</button>
+                    <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
+                        <div class="chapter-title">
+                            <span @click="chap.expanded = !chap.expanded">
+                                {{ chap.expanded ? '📂' : '📁' }} {{ chap.name }}
+                            </span>
+                            <div>
+                                <button class="icon-btn" title="新增二级题集" @click.stop="addSection(chap.name)">➕</button>
+                                <button class="icon-btn" title="删除整个章节" @click.stop="deleteChapter(chap.name)">🗑️</button>
+                            </div>
                         </div>
-                        <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
+                        
+                        <div v-show="chap.expanded">
+                            <div 
+                                v-for="sec in chap.sections" 
+                                :key="sec.name"
+                                class="section-item"
+                                :class="{ active: currentSelection === (chap.name + ' - ' + sec.name) }"
+                                @click="selectSection(chap.name, sec.name)"
+                            >
+                                <span>📄 {{ sec.name }}</span>
+                                <button class="icon-btn" title="删除题集" @click.stop="deleteSection(chap.name, sec.name)">❌</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="main-content" v-if="currentQuestions">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">{{ currentSelection }}</h2>
+                        <button class="btn btn-primary" @click="addQuestion">➕ 添加新题目</button>
+                    </div>
+                    
+                    <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
+                        <div class="question-header">
+                            <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
+                            <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 16px;"><strong>加入导出清单</strong></label>
+                            <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ 修正原代码</button>
+                            <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除题目</button>
+                        </div>
+                        
+                        <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
+                        
+                        <div class="editor-container" v-show="q.isEditing">
+                            <div style="margin-bottom: 5px;">
+                                <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
+                                <button class="btn" style="background:#6c757d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
+                                <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改</button>
+                            </div>
+                            <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div v-if="currentQuestions.length === 0" style="text-align:center; color:#888; margin-top: 50px;">
+                        这个题集目前没有题目，点击右上角添加吧！
                     </div>
                 </div>
             </div>
@@ -97,7 +139,6 @@
     </div>
 
     <script>
-        // 3. 配置 Marked 的 MathJax 扩展
         const mathExtension = {
             name: 'math', level: 'inline',
             start(src) { return src.search(/\$|\\\[|\\\(/); },
@@ -114,119 +155,163 @@
         };
         marked.use({ extensions: [mathExtension] });
 
-        // 4. Vue 应用逻辑
         const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
         createApp({
             setup() {
-                // ⚠️ 这里替换为你的真实配置
-                const supabaseUrl = 'https://fbjtwkqdmpxpukwtxutr.supabase.co';
-                const supabaseKey = 'sb_publishable_KJ1cxkgUEdDNp0P7CSKqJA_3umDV_mk';
-                const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-                const statusText = ref('正在连接云端数据库...');
-                const groupedData = ref([]);
-                const currentChapterIndex = ref(0);
+                // 状态管理
+                const supabaseUrl = '{{SUPABASE_URL}}';
+                const supabaseKey = '{{SUPABASE_KEY}}';
+                let supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+                const statusText = ref('系统准备就绪');
                 
-                const currentChapter = computed(() => groupedData.value[currentChapterIndex.value]);
+                // 数据管理
+                const allQuestions = ref([]); 
+                const currentSelection = ref(''); // 选中的 "章 - 节" 标识
 
+                // 树状菜单计算属性
+                const chapters = computed(() => {
+                    const tree = {};
+                    allQuestions.value.forEach(q => {
+                        const parts = q.chapter_title.split(' - ');
+                        const chapName = parts[0] || '未分类';
+                        const secName = parts[1] || '默认题集';
+                        
+                        if (!tree[chapName]) tree[chapName] = { name: chapName, expanded: true, sections: {} };
+                        if (!tree[chapName].sections[secName]) tree[chapName].sections[secName] = { name: secName };
+                    });
+                    
+                    // 转化为数组格式供 v-for 使用
+                    return Object.values(tree).map(c => ({
+                        ...c,
+                        sections: Object.values(c.sections)
+                    })).sort((a, b) => a.name.localeCompare(b.name));
+                });
+
+                // 当前显示的题目计算属性
+                const currentQuestions = computed(() => {
+                    return allQuestions.value.filter(q => q.chapter_title === currentSelection.value);
+                });
+
+                // 初始化认证
                 onMounted(async () => {
                     await loadData();
                 });
 
+                // 数据加载
                 async function loadData() {
+                    statusText.value = '正在同步云端数据...';
                     const { data, error } = await supabaseClient.from('questions').select('*').order('id');
                     if (error) {
-                        statusText.value = '❌ 数据加载失败: ' + error.message;
+                        statusText.value = '❌ 数据同步失败';
                         return;
                     }
+                    allQuestions.value = data.map(q => ({ ...q, selected: false, isEditing: false }));
                     
-                    const groups = {};
-                    data.forEach(q => {
-                        if (!groups[q.chapter_title]) groups[q.chapter_title] = { title: q.chapter_title, questions: [] };
-                        groups[q.chapter_title].questions.push({ ...q, selected: false, isEditing: false });
-                    });
-                    groupedData.value = Object.values(groups);
-                    statusText.value = '✅ 云端数据加载成功';
+                    // 默认选中第一项
+                    if (allQuestions.value.length > 0 && !currentSelection.value) {
+                        currentSelection.value = allQuestions.value[0].chapter_title;
+                    }
+                    statusText.value = '✅ 云端数据同步成功';
                     triggerMathJax();
                 }
 
-                function selectChapter(index) {
-                    currentChapterIndex.value = index;
+                // 树状菜单交互
+                function selectSection(chap, sec) {
+                    currentSelection.value = `${chap} - ${sec}`;
                     triggerMathJax();
                 }
 
-                function renderMarkdown(md) {
-                    return marked.parse(md);
+                // --- 新增 CRUD 核心功能 ---
+                
+                async function addChapter() {
+                    const newChap = prompt("请输入新【章】的名称：", "新增题库1");
+                    if (!newChap) return;
+                    const newSec = prompt("请为该章创建一个初始【题集】名称：", "题集0");
+                    if (!newSec) return;
+                    
+                    const title = `${newChap} - ${newSec}`;
+                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: 1, raw_md: "1. 新建题目（请点击修改代码编辑）" });
+                    if (!error) { selectSection(newChap, newSec); await loadData(); }
                 }
 
+                async function addSection(chapName) {
+                    const newSec = prompt(`在【${chapName}】下新增题集名称：`, "新题集");
+                    if (!newSec) return;
+                    
+                    const title = `${chapName} - ${newSec}`;
+                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: 1, raw_md: "1. 新建题目（请点击修改代码编辑）" });
+                    if (!error) { selectSection(chapName, newSec); await loadData(); }
+                }
+
+                async function deleteChapter(chapName) {
+                    if (!confirm(`⚠️ 警告：确定要删除【${chapName}】以及里面所有的题集和题目吗？这不可恢复！`)) return;
+                    statusText.value = '正在删除...';
+                    // 匹配 chapter_title 以 chapName - 开头的数据
+                    const { error } = await supabaseClient.from('questions').delete().like('chapter_title', `${chapName} - %`);
+                    if (!error) { currentSelection.value = ''; await loadData(); }
+                }
+
+                async function deleteSection(chapName, secName) {
+                    if (!confirm(`确定要删除题集【${secName}】及其所有题目吗？`)) return;
+                    statusText.value = '正在删除...';
+                    const { error } = await supabaseClient.from('questions').delete().eq('chapter_title', `${chapName} - ${secName}`);
+                    if (!error) { currentSelection.value = ''; await loadData(); }
+                }
+
+                async function addQuestion() {
+                    if (!currentSelection.value) return alert("请先在左侧选择一个题集");
+                    const title = currentSelection.value;
+                    const maxOrder = currentQuestions.value.length > 0 ? Math.max(...currentQuestions.value.map(q => q.question_order)) : 0;
+                    
+                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: maxOrder + 1, raw_md: `${maxOrder + 1}. 新题目描述...` });
+                    if (!error) await loadData();
+                }
+
+                async function deleteQuestion(id) {
+                    if (!confirm("确定要永久删除这道题吗？")) return;
+                    statusText.value = '正在删除题目...';
+                    const { error } = await supabaseClient.from('questions').delete().eq('id', id);
+                    if (!error) await loadData();
+                }
+
+                // Markdown 与 图片 功能 (保持不变)
+                function renderMarkdown(md) { return marked.parse(md); }
                 let timeout = null;
-                function debouncedRender() {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(triggerMathJax, 500);
-                }
-
+                function debouncedRender() { clearTimeout(timeout); timeout = setTimeout(triggerMathJax, 500); }
                 const triggerMathJax = async () => {
                     await nextTick();
-                    if (window.MathJax && window.MathJax.typesetPromise) {
-                        MathJax.typesetClear();
-                        MathJax.typesetPromise().catch(err => {});
-                    } else {
-                        setTimeout(triggerMathJax, 100);
-                    }
+                    if (window.MathJax && window.MathJax.typesetPromise) { MathJax.typesetClear(); MathJax.typesetPromise().catch(e=>{}); } 
+                    else { setTimeout(triggerMathJax, 100); }
                 };
 
                 async function saveQuestion(question) {
-                    statusText.value = '⏳ 正在保存...';
+                    statusText.value = '⏳ 保存中...';
                     const { error } = await supabaseClient.from('questions').update({ raw_md: question.raw_md }).eq('id', question.id);
-                    if (error) {
-                        statusText.value = '❌ 保存失败';
-                        alert(error.message);
-                    } else {
-                        statusText.value = '✅ 云端保存成功';
-                        setTimeout(() => statusText.value = '✅ 云端数据加载成功', 2000);
-                    }
+                    if (error) { alert("保存失败"); } 
+                    else { statusText.value = '✅ 保存成功'; question.isEditing = false; setTimeout(() => statusText.value = '✅ 云端数据同步成功', 2000); }
                 }
 
-                function triggerUpload(id) {
-                    document.getElementById('file-' + id).click();
-                }
-
+                function triggerUpload(id) { document.getElementById('file-' + id).click(); }
                 async function uploadImage(event, question) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    
-                    statusText.value = '⏳ 正在上传图片...';
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                    const file = event.target.files[0]; if (!file) return;
+                    statusText.value = '⏳ 上传图片中...';
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${file.name.split('.').pop()}`;
                     
                     const { error } = await supabaseClient.storage.from('images').upload(fileName, file);
-                    if (error) {
-                        alert('上传失败: ' + error.message);
-                        statusText.value = '❌ 上传失败';
-                        return;
-                    }
+                    if (error) { alert('上传失败: ' + error.message); statusText.value = '❌ 上传失败'; return; }
                     
                     const { data: { publicUrl } } = supabaseClient.storage.from('images').getPublicUrl(fileName);
-                    question.raw_md += `\n\n![图片说明](${publicUrl})\n\n`;
+                    question.raw_md += `\n\n![](${publicUrl})\n\n`;
                     saveQuestion(question);
                 }
 
-                // --- 导出逻辑 ---
+                // 导出逻辑
                 const cleanPrefix = (md) => md.replace(/^\d+\.\s*/, '');
-                const removeAnswer = (md) => {
-                    const matchIndex = md.search(/^解|^证/m);
-                    return matchIndex !== -1 ? md.substring(0, matchIndex).trim() : md;
-                };
-
-                function getSelectedQs() {
-                    let qs = [];
-                    groupedData.value.forEach(c => c.questions.forEach(q => { if (q.selected) qs.push(q); }));
-                    return qs;
-                }
+                const removeAnswer = (md) => { const i = md.search(/^解|^证/m); return i !== -1 ? md.substring(0, i).trim() : md; };
 
                 function exportMarkdown(includeAnswer) {
-                    const qs = getSelectedQs();
+                    let qs = allQuestions.value.filter(q => q.selected);
                     if (!qs.length) return alert("请先勾选题目");
                     
                     let content = "";
@@ -237,46 +322,15 @@
                     });
                     
                     const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a"); a.href = url; a.download = "错题集导出.md";
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "错题集导出.md";
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 }
 
-                function exportPDF(includeAnswer) {
-                    const qs = getSelectedQs();
-                    if (!qs.length) return alert("请先勾选题目");
-                    let title = prompt("请输入导出标题：", "作业整理");
-                    if (!title) return;
-
-                    let htmlContent = "";
-                    qs.forEach((q, i) => {
-                        let md = cleanPrefix(q.raw_md);
-                        if (!includeAnswer) md = removeAnswer(md);
-                        htmlContent += `
-                            <div style="margin-bottom: 40px; page-break-inside: avoid;">
-                                <h2 style="border-bottom: 2px solid #eaecef; padding-bottom: 8px;">题目 ${i + 1}</h2>
-                                <div style="font-size: 16px; line-height: 1.6;">${marked.parse(md)}</div>
-                            </div>`;
-                    });
-
-                    const win = window.open('', '_blank');
-                    win.document.write(`
-                        <!DOCTYPE html><html><head><title>${title}</title>
-                        <style>body{font-family:sans-serif; padding:40px; max-width:900px; margin:0 auto;} @media print{body{padding:0;} div{page-break-inside:avoid;}}</style>
-                        <script>
-                            window.MathJax = { tex: { inlineMath: [['\\\\(', '\\\\)'], ['$', '$']], displayMath: [['\\\\[', '\\\\]'], ['$$', '$$']] },
-                            startup: { pageReady: () => MathJax.startup.defaultPageReady().then(() => setTimeout(() => window.print(), 500)) }};
-                        <\/script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"><\/script>
-                        </head><body><h1 style="text-align:center;">${title}</h1>${htmlContent}</body></html>
-                    `);
-                    win.document.close();
-                }
-
-                // 将模板中需要用到的变量和方法 return 出去
                 return {
-                    statusText, groupedData, currentChapterIndex, currentChapter,
-                    selectChapter, renderMarkdown, debouncedRender, saveQuestion,
-                    triggerUpload, uploadImage, exportMarkdown, exportPDF
+                    statusText,
+                    chapters, currentSelection, currentQuestions, selectSection,
+                    addChapter, addSection, deleteChapter, deleteSection, addQuestion, deleteQuestion,
+                    renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, exportMarkdown
                 };
             }
         }).mount('#app');

@@ -1,0 +1,38 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ] # 监听 main 分支的提交
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 这里的核心逻辑：用 GitHub Secrets 替换 HTML 里的占位符
+      - name: Inject Secrets into HTML
+        run: |
+          sed -i 's|{{SUPABASE_URL}}|${{ secrets.SUPABASE_URL }}|g' index.html
+          sed -i 's|{{SUPABASE_KEY}}|${{ secrets.SUPABASE_KEY }}|g' index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
