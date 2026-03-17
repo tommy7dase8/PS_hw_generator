@@ -17,22 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # 已升级
 
-      # 这里的核心逻辑：用 GitHub Secrets 替换 HTML 里的占位符
       - name: Inject Secrets into HTML
         run: |
           sed -i 's|{{SUPABASE_URL}}|${{ secrets.SUPABASE_URL }}|g' index.html
           sed -i 's|{{SUPABASE_KEY}}|${{ secrets.SUPABASE_KEY }}|g' index.html
 
       - name: Setup Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v5 # 已升级
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3 # 已升级，解决你截图中的报错
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4 # 已升级

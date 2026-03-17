@@ -22,12 +22,11 @@
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f5f5f5; }
-                
+        
         #toolbar { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: #333; color: white; display: flex; align-items: center; padding: 0 20px; z-index: 100; justify-content: space-between; }
         .toolbar-buttons { display: flex; gap: 10px; }
         #app-container { display: flex; width: 100%; margin-top: 60px; height: calc(100vh - 60px); }
         
-        /* 侧边栏二级菜单样式 */
         #sidebar { width: 280px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column;}
         .sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         .chapter-box { border-bottom: 1px solid #f0f0f0; }
@@ -60,79 +59,75 @@
 </head>
 <body>
     <div id="app">
-
-        <div>
-            <div id="toolbar">
-                <div id="status-text" style="font-weight: bold; font-size: 16px;">{{ statusText }}</div>
-                <div class="toolbar-buttons">
-                    <button class="btn btn-primary" @click="resetCredentials">⚙️ 重置凭证</button>
-                    <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出带答案(MD)</button>
-                    <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 仅导出题目(MD)</button>
-                </div>
+        <div id="toolbar">
+            <div id="status-text" style="font-weight: bold; font-size: 16px;">{{ statusText }}</div>
+            <div class="toolbar-buttons">
+                <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出带答案(MD)</button>
+                <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 仅导出题目(MD)</button>
             </div>
+        </div>
 
-            <div id="app-container">
-                <div id="sidebar">
-                    <div class="sidebar-header">
-                        题库目录树
-                        <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
+        <div id="app-container">
+            <div id="sidebar">
+                <div class="sidebar-header">
+                    题库目录树
+                    <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
+                </div>
+                
+                <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
+                    <div class="chapter-title">
+                        <span @click="chap.expanded = !chap.expanded">
+                            {{ chap.expanded ? '📂' : '📁' }} {{ chap.name }}
+                        </span>
+                        <div>
+                            <button class="icon-btn" title="新增二级题集" @click.stop="addSection(chap.name)">➕</button>
+                            <button class="icon-btn" title="删除整个章节" @click.stop="deleteChapter(chap.name)">🗑️</button>
+                        </div>
                     </div>
                     
-                    <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
-                        <div class="chapter-title">
-                            <span @click="chap.expanded = !chap.expanded">
-                                {{ chap.expanded ? '📂' : '📁' }} {{ chap.name }}
-                            </span>
-                            <div>
-                                <button class="icon-btn" title="新增二级题集" @click.stop="addSection(chap.name)">➕</button>
-                                <button class="icon-btn" title="删除整个章节" @click.stop="deleteChapter(chap.name)">🗑️</button>
-                            </div>
+                    <div v-show="chap.expanded">
+                        <div 
+                            v-for="sec in chap.sections" 
+                            :key="sec.name"
+                            class="section-item"
+                            :class="{ active: currentSelection === (chap.name + ' - ' + sec.name) }"
+                            @click="selectSection(chap.name, sec.name)"
+                        >
+                            <span>📄 {{ sec.name }}</span>
+                            <button class="icon-btn" title="删除题集" @click.stop="deleteSection(chap.name, sec.name)">❌</button>
                         </div>
-                        
-                        <div v-show="chap.expanded">
-                            <div 
-                                v-for="sec in chap.sections" 
-                                :key="sec.name"
-                                class="section-item"
-                                :class="{ active: currentSelection === (chap.name + ' - ' + sec.name) }"
-                                @click="selectSection(chap.name, sec.name)"
-                            >
-                                <span>📄 {{ sec.name }}</span>
-                                <button class="icon-btn" title="删除题集" @click.stop="deleteSection(chap.name, sec.name)">❌</button>
-                            </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="main-content" v-if="currentQuestions">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">{{ currentSelection }}</h2>
+                    <button class="btn btn-primary" @click="addQuestion">➕ 添加新题目</button>
+                </div>
+                
+                <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
+                    <div class="question-header">
+                        <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
+                        <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 16px;"><strong>加入导出清单</strong></label>
+                        <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ 修正原代码</button>
+                        <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除题目</button>
+                    </div>
+                    
+                    <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
+                    
+                    <div class="editor-container" v-show="q.isEditing">
+                        <div style="margin-bottom: 5px;">
+                            <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
+                            <button class="btn" style="background:#6c757d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
+                            <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改</button>
                         </div>
+                        <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
                     </div>
                 </div>
                 
-                <div id="main-content" v-if="currentQuestions">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0;">{{ currentSelection }}</h2>
-                        <button class="btn btn-primary" @click="addQuestion">➕ 添加新题目</button>
-                    </div>
-                    
-                    <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
-                        <div class="question-header">
-                            <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
-                            <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 16px;"><strong>加入导出清单</strong></label>
-                            <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ 修正原代码</button>
-                            <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除题目</button>
-                        </div>
-                        
-                        <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
-                        
-                        <div class="editor-container" v-show="q.isEditing">
-                            <div style="margin-bottom: 5px;">
-                                <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
-                                <button class="btn" style="background:#6c757d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
-                                <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改</button>
-                            </div>
-                            <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
-                        </div>
-                    </div>
-                    
-                    <div v-if="currentQuestions.length === 0" style="text-align:center; color:#888; margin-top: 50px;">
-                        这个题集目前没有题目，点击右上角添加吧！
-                    </div>
+                <div v-if="currentQuestions.length === 0" style="text-align:center; color:#888; margin-top: 50px;">
+                    这个题集目前没有题目，点击右上角添加吧！
                 </div>
             </div>
         </div>
@@ -159,17 +154,15 @@
 
         createApp({
             setup() {
-                // 状态管理
+                // 这里由 GitHub Actions 自动注入 Secrets
                 const supabaseUrl = '{{SUPABASE_URL}}';
                 const supabaseKey = '{{SUPABASE_KEY}}';
-                let supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-                const statusText = ref('系统准备就绪');
-                
-                // 数据管理
-                const allQuestions = ref([]); 
-                const currentSelection = ref(''); // 选中的 "章 - 节" 标识
+                const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-                // 树状菜单计算属性
+                const statusText = ref('正在连接云端数据库...');
+                const allQuestions = ref([]); 
+                const currentSelection = ref('');
+
                 const chapters = computed(() => {
                     const tree = {};
                     allQuestions.value.forEach(q => {
@@ -181,34 +174,29 @@
                         if (!tree[chapName].sections[secName]) tree[chapName].sections[secName] = { name: secName };
                     });
                     
-                    // 转化为数组格式供 v-for 使用
                     return Object.values(tree).map(c => ({
                         ...c,
                         sections: Object.values(c.sections)
                     })).sort((a, b) => a.name.localeCompare(b.name));
                 });
 
-                // 当前显示的题目计算属性
                 const currentQuestions = computed(() => {
-                    return allQuestions.value.filter(q => q.chapter_title === currentSelection.value);
+                    return allQuestions.value.filter(q => q.chapter_title === currentSelection.value).sort((a, b) => a.question_order - b.question_order);
                 });
 
-                // 初始化认证
                 onMounted(async () => {
                     await loadData();
                 });
 
-                // 数据加载
                 async function loadData() {
                     statusText.value = '正在同步云端数据...';
                     const { data, error } = await supabaseClient.from('questions').select('*').order('id');
                     if (error) {
-                        statusText.value = '❌ 数据同步失败';
+                        statusText.value = '❌ 数据同步失败: ' + error.message;
                         return;
                     }
                     allQuestions.value = data.map(q => ({ ...q, selected: false, isEditing: false }));
                     
-                    // 默认选中第一项
                     if (allQuestions.value.length > 0 && !currentSelection.value) {
                         currentSelection.value = allQuestions.value[0].chapter_title;
                     }
@@ -216,14 +204,11 @@
                     triggerMathJax();
                 }
 
-                // 树状菜单交互
                 function selectSection(chap, sec) {
                     currentSelection.value = `${chap} - ${sec}`;
                     triggerMathJax();
                 }
 
-                // --- 新增 CRUD 核心功能 ---
-                
                 async function addChapter() {
                     const newChap = prompt("请输入新【章】的名称：", "新增题库1");
                     if (!newChap) return;
@@ -247,7 +232,6 @@
                 async function deleteChapter(chapName) {
                     if (!confirm(`⚠️ 警告：确定要删除【${chapName}】以及里面所有的题集和题目吗？这不可恢复！`)) return;
                     statusText.value = '正在删除...';
-                    // 匹配 chapter_title 以 chapName - 开头的数据
                     const { error } = await supabaseClient.from('questions').delete().like('chapter_title', `${chapName} - %`);
                     if (!error) { currentSelection.value = ''; await loadData(); }
                 }
@@ -275,7 +259,6 @@
                     if (!error) await loadData();
                 }
 
-                // Markdown 与 图片 功能 (保持不变)
                 function renderMarkdown(md) { return marked.parse(md); }
                 let timeout = null;
                 function debouncedRender() { clearTimeout(timeout); timeout = setTimeout(triggerMathJax, 500); }
@@ -306,7 +289,6 @@
                     saveQuestion(question);
                 }
 
-                // 导出逻辑
                 const cleanPrefix = (md) => md.replace(/^\d+\.\s*/, '');
                 const removeAnswer = (md) => { const i = md.search(/^解|^证/m); return i !== -1 ? md.substring(0, i).trim() : md; };
 
@@ -327,8 +309,7 @@
                 }
 
                 return {
-                    statusText,
-                    chapters, currentSelection, currentQuestions, selectSection,
+                    statusText, chapters, currentSelection, currentQuestions, selectSection,
                     addChapter, addSection, deleteChapter, deleteSection, addQuestion, deleteQuestion,
                     renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, exportMarkdown
                 };
