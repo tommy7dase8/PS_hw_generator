@@ -21,54 +21,72 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f5f5f5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f5f5f5; overflow: hidden; }
         
-        #toolbar { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: #333; color: white; display: flex; align-items: center; padding: 0 20px; z-index: 100; justify-content: space-between; }
-        .toolbar-buttons { display: flex; gap: 10px; }
+        #toolbar { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: #2c3e50; color: white; display: flex; align-items: center; padding: 0 20px; z-index: 100; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+        .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 10px; }
+        
         #app-container { display: flex; width: 100%; margin-top: 60px; height: calc(100vh - 60px); }
         
-        #sidebar { width: 280px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column;}
+        /* 左侧菜单 */
+        #sidebar { width: 280px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column; transition: width 0.3s; }
         .sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         .chapter-box { border-bottom: 1px solid #f0f0f0; }
         .chapter-title { padding: 10px 15px; background: #fafafa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 15px; }
         .chapter-title:hover { background: #f0f0f0; }
         .section-item { padding: 8px 15px 8px 30px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #555; transition: 0.2s;}
         .section-item:hover { background-color: #e9ecef; }
-        .section-item.active { background-color: #007bff; color: white; }
+        .section-item.active { background-color: #3498db; color: white; }
         .section-item.active .icon-btn { color: white; }
         
         .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; color: #888; padding: 2px 5px; border-radius: 4px;}
         .icon-btn:hover { background: rgba(0,0,0,0.1); }
         
-        #main-content { flex: 1; padding: 20px; overflow-y: auto; }
+        /* 中间内容区 */
+        #main-content { flex: 1; padding: 20px; overflow-y: auto; background-color: #f5f7fa; }
         
-        .question-card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative;}
-        .question-header { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .editor-container { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;}
-        textarea.md-editor { width: 100%; height: 180px; font-family: monospace; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical; }
+        /* 右侧 PDF 区 */
+        #pdf-panel { width: 450px; background: #fff; border-left: 1px solid #ddd; display: flex; flex-direction: column; transition: width 0.3s;}
+        .pdf-header { padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         
-        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.2s; }
-        .btn:hover { opacity: 0.9; }
-        .btn-primary { background-color: #007bff; color: white; }
-        .btn-edit { background-color: #ffc107; color: #333; }
-        .btn-danger { background-color: #dc3545; color: white; }
-        .btn-save { background-color: #28a745; color: white; font-weight: bold; }
-        .btn-export { background-color: #17a2b8; color: white; font-weight: bold; }
-        .preview-area { min-height: 50px; font-size: 16px; line-height: 1.6; }
+        .question-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .question-header { display: flex; align-items: center; margin-bottom: 15px; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .editor-container { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;}
+        textarea.md-editor { width: 100%; height: 200px; font-family: 'Courier New', Courier, monospace; padding: 12px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 4px; resize: vertical; line-height: 1.5;}
+        
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-toggle { background: transparent; border: 1px solid rgba(255,255,255,0.5); color: white; font-size: 16px; padding: 4px 10px; }
+        .btn-primary { background-color: #3498db; color: white; }
+        .btn-edit { background-color: #f1c40f; color: #333; }
+        .btn-danger { background-color: #e74c3c; color: white; }
+        .btn-save { background-color: #2ecc71; color: white; }
+        .btn-export { background-color: #9b59b6; color: white; }
+        .btn-pdf { background-color: #e67e22; color: white; }
+        
+        .preview-area { min-height: 50px; font-size: 16px; line-height: 1.7; color: #2c3e50; }
     </style>
 </head>
 <body>
     <div id="app">
         <div id="toolbar">
-            <div id="status-text" style="font-weight: bold; font-size: 16px;">{{ statusText }}</div>
-            <div class="toolbar-buttons">
-                <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出带答案(MD)</button>
-                <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 仅导出题目(MD)</button>
+            <div class="toolbar-left">
+                <button class="btn btn-toggle" @click="isSidebarOpen = !isSidebarOpen" title="折叠/展开目录">☰</button>
+                <span style="font-weight: bold; font-size: 16px; margin-left: 10px;">{{ statusText }}</span>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出 MD (带答案)</button>
+                <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 导出 MD (纯题)</button>
+                <button class="btn btn-pdf" @click="exportPDF(true)">🖨️ 导出 PDF (带答案)</button>
+                <button class="btn btn-pdf" @click="exportPDF(false)">🖨️ 导出 PDF (纯题)</button>
+                <button class="btn btn-toggle" @click="isPdfOpen = !isPdfOpen" :style="{ background: isPdfOpen ? '#34495e' : 'transparent' }">
+                    📖 {{ isPdfOpen ? '关闭核对区' : '打开核对区' }}
+                </button>
             </div>
         </div>
 
         <div id="app-container">
-            <div id="sidebar">
+            <div id="sidebar" v-show="isSidebarOpen">
                 <div class="sidebar-header">
                     题库目录树
                     <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
@@ -101,33 +119,46 @@
             </div>
             
             <div id="main-content" v-if="currentQuestions">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">{{ currentSelection }}</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <h2 style="margin: 0; color: #2c3e50;">{{ currentSelection }}</h2>
                     <button class="btn btn-primary" @click="addQuestion">➕ 添加新题目</button>
                 </div>
                 
                 <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
                     <div class="question-header">
                         <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
-                        <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 16px;"><strong>加入导出清单</strong></label>
-                        <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ 修正原代码</button>
-                        <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除题目</button>
+                        <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 15px; color:#555;">加入导出清单</label>
+                        <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ {{ q.isEditing ? '收起编辑' : '修改原代码' }}</button>
+                        <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除</button>
                     </div>
                     
                     <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
                     
                     <div class="editor-container" v-show="q.isEditing">
-                        <div style="margin-bottom: 5px;">
+                        <div style="margin-bottom: 10px;">
                             <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
-                            <button class="btn" style="background:#6c757d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
-                            <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改</button>
+                            <button class="btn" style="background:#7f8c8d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
+                            <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改到云端</button>
                         </div>
                         <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
                     </div>
                 </div>
                 
-                <div v-if="currentQuestions.length === 0" style="text-align:center; color:#888; margin-top: 50px;">
+                <div v-if="currentQuestions.length === 0" style="text-align:center; color:#95a5a6; margin-top: 50px; padding: 40px; background: white; border-radius: 8px;">
                     这个题集目前没有题目，点击右上角添加吧！
+                </div>
+            </div>
+
+            <div id="pdf-panel" v-show="isPdfOpen">
+                <div class="pdf-header">
+                    <span>📑 参考文档 ({{ currentSelection.split(' - ')[1] || '无' }})</span>
+                    <button class="icon-btn" style="font-size: 16px;" @click="isPdfOpen = false">✖</button>
+                </div>
+                <iframe v-if="currentPdfUrl" :src="currentPdfUrl" style="flex: 1; border: none; width: 100%;"></iframe>
+                <div v-else style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #7f8c8d; text-align: center;">
+                    <span style="font-size: 40px; margin-bottom: 10px;">📄</span>
+                    <p>当前题集没有配置关联的 PDF。</p>
+                    <p style="font-size: 12px;">请在根目录的 <code>pdf_mapping.json</code> 中配置映射。</p>
                 </div>
             </div>
         </div>
@@ -154,7 +185,6 @@
 
         createApp({
             setup() {
-                // 这里由 GitHub Actions 自动注入 Secrets
                 const supabaseUrl = '{{SUPABASE_URL}}';
                 const supabaseKey = '{{SUPABASE_KEY}}';
                 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -162,6 +192,28 @@
                 const statusText = ref('正在连接云端数据库...');
                 const allQuestions = ref([]); 
                 const currentSelection = ref('');
+                
+                // 布局控制状态
+                const isSidebarOpen = ref(true);
+                const isPdfOpen = ref(false);
+                
+                // PDF 映射数据
+                const pdfMapping = ref({});
+
+                // === 中文字典排序核心逻辑 ===
+                const cnOrder = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五"];
+                function getChapterWeight(name) {
+                    const match = name.match(/第(.+?)章/);
+                    if (match) {
+                        const idx = cnOrder.indexOf(match[1]);
+                        if (idx !== -1) return idx;
+                    }
+                    return 999; // 匹配不到放最后
+                }
+                function getSectionWeight(name) {
+                    const match = name.match(/(\d+\.\d+)/);
+                    return match ? parseFloat(match[1]) : 999;
+                }
 
                 const chapters = computed(() => {
                     const tree = {};
@@ -174,31 +226,58 @@
                         if (!tree[chapName].sections[secName]) tree[chapName].sections[secName] = { name: secName };
                     });
                     
-                    return Object.values(tree).map(c => ({
-                        ...c,
-                        sections: Object.values(c.sections)
-                    })).sort((a, b) => a.name.localeCompare(b.name));
+                    // 1. 章排序
+                    return Object.values(tree).map(c => {
+                        // 2. 节排序
+                        const sortedSections = Object.values(c.sections).sort((a, b) => {
+                            return getSectionWeight(a.name) - getSectionWeight(b.name) || a.name.localeCompare(b.name);
+                        });
+                        return { ...c, sections: sortedSections };
+                    }).sort((a, b) => {
+                        return getChapterWeight(a.name) - getChapterWeight(b.name) || a.name.localeCompare(b.name);
+                    });
                 });
 
                 const currentQuestions = computed(() => {
                     return allQuestions.value.filter(q => q.chapter_title === currentSelection.value).sort((a, b) => a.question_order - b.question_order);
                 });
 
+                // 获取当前应该显示的 PDF 链接
+                const currentPdfUrl = computed(() => {
+                    return pdfMapping.value[currentSelection.value] || '';
+                });
+
                 onMounted(async () => {
                     await loadData();
+                    await loadPdfMapping(); // 加载 JSON 映射
                 });
+
+                // 读取同目录下的 pdf_mapping.json
+                async function loadPdfMapping() {
+                    try {
+                        const res = await fetch('pdf_mapping.json');
+                        if (res.ok) {
+                            pdfMapping.value = await res.json();
+                        }
+                    } catch (e) {
+                        console.warn('未找到 pdf_mapping.json，PDF 映射功能将不可用');
+                    }
+                }
 
                 async function loadData() {
                     statusText.value = '正在同步云端数据...';
                     const { data, error } = await supabaseClient.from('questions').select('*').order('id');
                     if (error) {
-                        statusText.value = '❌ 数据同步失败: ' + error.message;
+                        statusText.value = '❌ 数据同步失败';
                         return;
                     }
                     allQuestions.value = data.map(q => ({ ...q, selected: false, isEditing: false }));
                     
                     if (allQuestions.value.length > 0 && !currentSelection.value) {
-                        currentSelection.value = allQuestions.value[0].chapter_title;
+                        // 初始加载时默认选中排序后的第一个章的第一个节
+                        if (chapters.value.length > 0 && chapters.value[0].sections.length > 0) {
+                            currentSelection.value = `${chapters.value[0].name} - ${chapters.value[0].sections[0].name}`;
+                        }
                     }
                     statusText.value = '✅ 云端数据同步成功';
                     triggerMathJax();
@@ -209,56 +288,51 @@
                     triggerMathJax();
                 }
 
+                // CRUD 操作...
                 async function addChapter() {
-                    const newChap = prompt("请输入新【章】的名称：", "新增题库1");
+                    const newChap = prompt("请输入新【章】的名称 (如: 第一章)：", "新章节");
                     if (!newChap) return;
-                    const newSec = prompt("请为该章创建一个初始【题集】名称：", "题集0");
+                    const newSec = prompt("请为该章创建一个初始【题集】名称 (如: 1.1习题)：", "1.1习题");
                     if (!newSec) return;
-                    
                     const title = `${newChap} - ${newSec}`;
-                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: 1, raw_md: "1. 新建题目（请点击修改代码编辑）" });
+                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: 1, raw_md: "1. 新建题目" });
                     if (!error) { selectSection(newChap, newSec); await loadData(); }
                 }
 
                 async function addSection(chapName) {
                     const newSec = prompt(`在【${chapName}】下新增题集名称：`, "新题集");
                     if (!newSec) return;
-                    
                     const title = `${chapName} - ${newSec}`;
-                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: 1, raw_md: "1. 新建题目（请点击修改代码编辑）" });
+                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: 1, raw_md: "1. 新建题目" });
                     if (!error) { selectSection(chapName, newSec); await loadData(); }
                 }
 
                 async function deleteChapter(chapName) {
-                    if (!confirm(`⚠️ 警告：确定要删除【${chapName}】以及里面所有的题集和题目吗？这不可恢复！`)) return;
-                    statusText.value = '正在删除...';
-                    const { error } = await supabaseClient.from('questions').delete().like('chapter_title', `${chapName} - %`);
-                    if (!error) { currentSelection.value = ''; await loadData(); }
+                    if (!confirm(`⚠️ 确定要删除【${chapName}】所有内容吗？`)) return;
+                    await supabaseClient.from('questions').delete().like('chapter_title', `${chapName} - %`);
+                    currentSelection.value = ''; await loadData();
                 }
 
                 async function deleteSection(chapName, secName) {
-                    if (!confirm(`确定要删除题集【${secName}】及其所有题目吗？`)) return;
-                    statusText.value = '正在删除...';
-                    const { error } = await supabaseClient.from('questions').delete().eq('chapter_title', `${chapName} - ${secName}`);
-                    if (!error) { currentSelection.value = ''; await loadData(); }
+                    if (!confirm(`确定要删除题集【${secName}】吗？`)) return;
+                    await supabaseClient.from('questions').delete().eq('chapter_title', `${chapName} - ${secName}`);
+                    currentSelection.value = ''; await loadData();
                 }
 
                 async function addQuestion() {
                     if (!currentSelection.value) return alert("请先在左侧选择一个题集");
-                    const title = currentSelection.value;
                     const maxOrder = currentQuestions.value.length > 0 ? Math.max(...currentQuestions.value.map(q => q.question_order)) : 0;
-                    
-                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: title, question_order: maxOrder + 1, raw_md: `${maxOrder + 1}. 新题目描述...` });
+                    const { error } = await supabaseClient.from('questions').insert({ chapter_title: currentSelection.value, question_order: maxOrder + 1, raw_md: `${maxOrder + 1}. 新题目` });
                     if (!error) await loadData();
                 }
 
                 async function deleteQuestion(id) {
                     if (!confirm("确定要永久删除这道题吗？")) return;
-                    statusText.value = '正在删除题目...';
                     const { error } = await supabaseClient.from('questions').delete().eq('id', id);
                     if (!error) await loadData();
                 }
 
+                // 渲染与保存
                 function renderMarkdown(md) { return marked.parse(md); }
                 let timeout = null;
                 function debouncedRender() { clearTimeout(timeout); timeout = setTimeout(triggerMathJax, 500); }
@@ -271,47 +345,86 @@
                 async function saveQuestion(question) {
                     statusText.value = '⏳ 保存中...';
                     const { error } = await supabaseClient.from('questions').update({ raw_md: question.raw_md }).eq('id', question.id);
-                    if (error) { alert("保存失败"); } 
-                    else { statusText.value = '✅ 保存成功'; question.isEditing = false; setTimeout(() => statusText.value = '✅ 云端数据同步成功', 2000); }
+                    if (!error) { statusText.value = '✅ 保存成功'; question.isEditing = false; setTimeout(() => statusText.value = '✅ 云端数据同步成功', 2000); }
                 }
 
+                // 图片上传
                 function triggerUpload(id) { document.getElementById('file-' + id).click(); }
                 async function uploadImage(event, question) {
                     const file = event.target.files[0]; if (!file) return;
-                    statusText.value = '⏳ 上传图片中...';
+                    statusText.value = '⏳ 上传中...';
                     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${file.name.split('.').pop()}`;
-                    
                     const { error } = await supabaseClient.storage.from('images').upload(fileName, file);
-                    if (error) { alert('上传失败: ' + error.message); statusText.value = '❌ 上传失败'; return; }
-                    
+                    if (error) return alert('上传失败');
                     const { data: { publicUrl } } = supabaseClient.storage.from('images').getPublicUrl(fileName);
                     question.raw_md += `\n\n![](${publicUrl})\n\n`;
                     saveQuestion(question);
                 }
 
+                // === 导出逻辑 ===
                 const cleanPrefix = (md) => md.replace(/^\d+\.\s*/, '');
                 const removeAnswer = (md) => { const i = md.search(/^解|^证/m); return i !== -1 ? md.substring(0, i).trim() : md; };
 
+                function getSelectedQs() {
+                    let qs = [];
+                    allQuestions.value.forEach(q => { if (q.selected) qs.push(q); });
+                    return qs;
+                }
+
                 function exportMarkdown(includeAnswer) {
-                    let qs = allQuestions.value.filter(q => q.selected);
-                    if (!qs.length) return alert("请先勾选题目");
-                    
+                    const qs = getSelectedQs();
+                    if (!qs.length) return alert("请先勾选要导出的题目");
                     let content = "";
                     qs.forEach((q, i) => {
                         let md = cleanPrefix(q.raw_md);
                         if (!includeAnswer) md = removeAnswer(md);
                         content += `### 题目 ${i + 1}\n\n${md}\n\n---\n\n`;
                     });
-                    
                     const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-                    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "错题集导出.md";
+                    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "习题集.md";
                     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                }
+
+                // 加回导出 PDF 功能
+                function exportPDF(includeAnswer) {
+                    const qs = getSelectedQs();
+                    if (!qs.length) return alert("请先勾选要导出的题目");
+                    let title = prompt("请输入 PDF 文档标题：", currentSelection.value || "习题");
+                    if (!title) return;
+
+                    let htmlContent = "";
+                    qs.forEach((q, i) => {
+                        let md = cleanPrefix(q.raw_md);
+                        if (!includeAnswer) md = removeAnswer(md);
+                        htmlContent += `
+                            <div style="margin-bottom: 40px; page-break-inside: avoid;">
+                                <h2 style="border-bottom: 2px solid #eaecef; padding-bottom: 8px; font-size: 1.2em;">题目 ${i + 1}</h2>
+                                <div style="font-size: 16px; line-height: 1.6;">${marked.parse(md)}</div>
+                            </div>`;
+                    });
+
+                    const win = window.open('', '_blank');
+                    win.document.write(`
+                        <!DOCTYPE html><html><head><title>${title}</title>
+                        <style>
+                            body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; color: #333; }
+                            @media print { body { padding: 0; max-width: 100%; } div { page-break-inside: avoid; } }
+                        </style>
+                        <script>
+                            window.MathJax = { tex: { inlineMath: [['\\\\(', '\\\\)'], ['$', '$']], displayMath: [['\\\\[', '\\\\]'], ['$$', '$$']] },
+                            startup: { pageReady: () => MathJax.startup.defaultPageReady().then(() => setTimeout(() => window.print(), 500)) }};
+                        <\/script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"><\/script>
+                        </head><body><h1 style="text-align:center; margin-bottom: 50px;">${title}</h1>${htmlContent}</body></html>
+                    `);
+                    win.document.close();
                 }
 
                 return {
                     statusText, chapters, currentSelection, currentQuestions, selectSection,
                     addChapter, addSection, deleteChapter, deleteSection, addQuestion, deleteQuestion,
-                    renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, exportMarkdown
+                    renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, 
+                    exportMarkdown, exportPDF,
+                    isSidebarOpen, isPdfOpen, currentPdfUrl
                 };
             }
         }).mount('#app');
