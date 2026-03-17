@@ -165,21 +165,50 @@
     </div>
 
     <script>
-        const mathExtension = {
-            name: 'math', level: 'inline',
-            start(src) { return src.search(/\$|\\\[|\\\(/); },
+        // 1. 块级公式扩展（专治多行 $$ 和 \[ \]）
+        const blockMathExtension = {
+            name: 'blockMath',
+            level: 'block', // 声明为块级元素，允许内部有随意换行
+            start(src) { return src.search(/^[ \t]*(\$\$|\\\[)/m); },
             tokenizer(src, tokens) {
-                const blockMatch = src.match(/^(?:\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\])/);
-                if (blockMatch) return { type: 'math', raw: blockMatch[0], text: blockMatch[1] || blockMatch[2], displayMode: true };
-                const inlineMatch = src.match(/^(?:\$([\s\S]+?)\$|\\\(([\s\S]+?)\\\))/);
-                if (inlineMatch) return { type: 'math', raw: inlineMatch[0], text: inlineMatch[1] || inlineMatch[2], displayMode: false };
+                const match = src.match(/^[ \t]*(?:\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\])/);
+                if (match) {
+                    return {
+                        type: 'blockMath',
+                        raw: match[0],
+                        text: match[1] || match[2]
+                    };
+                }
             },
             renderer(token) {
                 const escapeHtml = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                return token.displayMode ? `\\[${escapeHtml(token.text)}\\]` : `\\(${escapeHtml(token.text)}\\)`;
+                return `<div class="math-block">\\[${escapeHtml(token.text)}\\]</div>`;
             }
         };
-        marked.use({ extensions: [mathExtension] });
+
+        // 2. 内联公式扩展（处理单行的 $ 和 \( \)）
+        const inlineMathExtension = {
+            name: 'inlineMath',
+            level: 'inline',
+            start(src) { return src.search(/\$|\\\(/); },
+            tokenizer(src, tokens) {
+                const match = src.match(/^(?:\$([\s\S]+?)\$|\\\(([\s\S]+?)\\\))/);
+                if (match) {
+                    return {
+                        type: 'inlineMath',
+                        raw: match[0],
+                        text: match[1] || match[2]
+                    };
+                }
+            },
+            renderer(token) {
+                const escapeHtml = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `\\(${escapeHtml(token.text)}\\)`;
+            }
+        };
+
+        // 3. 同时注册两个扩展
+        marked.use({ extensions: [blockMathExtension, inlineMathExtension] });
 
         const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
