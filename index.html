@@ -29,7 +29,7 @@
         #app-container { display: flex; width: 100%; margin-top: 60px; height: calc(100vh - 60px); }
         
         /* 左侧菜单 */
-        #sidebar { width: 280px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column; transition: width 0.3s; }
+        #sidebar { background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column; flex-shrink: 0; }
         .sidebar-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         .chapter-box { border-bottom: 1px solid #f0f0f0; }
         .chapter-title { padding: 10px 15px; background: #fafafa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 15px; }
@@ -43,10 +43,10 @@
         .icon-btn:hover { background: rgba(0,0,0,0.1); }
         
         /* 中间内容区 */
-        #main-content { flex: 1; padding: 20px; overflow-y: auto; background-color: #f5f7fa; }
+        #main-content { flex: 1; padding: 20px; overflow-y: auto; background-color: #f5f7fa; min-width: 300px; } /* 保证中间至少有 300px */
         
         /* 右侧 PDF 区 */
-        #pdf-panel { width: 450px; background: #fff; border-left: 1px solid #ddd; display: flex; flex-direction: column; transition: width 0.3s;}
+        #pdf-panel { background: #fff; border-left: 1px solid #ddd; display: flex; flex-direction: column; flex-shrink: 0; }
         .pdf-header { padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         
         .question-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
@@ -85,6 +85,21 @@
         .preview-area tr:nth-child(2n) {
             background-color: #fbfbfc; /* 隔行变色 */
         }
+
+        /* 新增：拖拽条的样式 */
+        .resizer {
+            width: 6px;
+            background-color: #e2e8f0;
+            cursor: col-resize;
+            transition: background-color 0.2s;
+            z-index: 10;
+        }
+        .resizer:hover, .resizer.active {
+            background-color: #3498db;
+        }
+
+        /* 新增：拖拽时防止文本被意外选中变蓝 */
+        .no-select { user-select: none; }
     </style>
 </head>
 <body>
@@ -105,10 +120,10 @@
             </div>
         </div>
 
-        <div id="app-container">
-            <div id="sidebar" v-show="isSidebarOpen">
+        <div id="app-container" :class="{ 'no-select': isResizing }">
+            <div id="sidebar" v-show="isSidebarOpen" :style="{ width: sidebarWidth + 'px', maxWidth: '40vw' }">
                 <div class="sidebar-header">
-                    题库目录树
+                    课本习题目录树
                     <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
                 </div>
                 
@@ -138,6 +153,8 @@
                 </div>
             </div>
             
+            <div class="resizer" v-show="isSidebarOpen" @mousedown="startResize('sidebar', $event)" :class="{ active: resizeType === 'sidebar' }"></div>
+
             <div id="main-content" v-if="currentQuestions">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                     <h2 style="margin: 0; color: #2c3e50;">{{ currentSelection }}</h2>
@@ -169,7 +186,7 @@
                 </div>
             </div>
 
-            <div id="pdf-panel" v-show="isPdfOpen">
+            <div id="pdf-panel" v-show="isPdfOpen" :style="{ width: pdfWidth + 'px', maxWidth: '50vw' }">
                 <div class="pdf-header">
                     <span>📑 参考文档 ({{ currentSelection.split(' - ')[1] || '无' }})</span>
                     <button class="icon-btn" style="font-size: 16px;" @click="isPdfOpen = false">✖</button>
@@ -248,6 +265,46 @@
                 
                 // PDF 映射数据
                 const pdfMapping = ref({});
+
+
+                // === 新增：拖拽调整宽度逻辑 ===
+                const sidebarWidth = ref(280); // 默认左侧 280px
+                const pdfWidth = ref(450);     // 默认右侧 450px
+                const isResizing = ref(false);
+                const resizeType = ref(null);
+
+                function startResize(type, event) {
+                    isResizing.value = true;
+                    resizeType.value = type;
+                    // 把监听器挂在 document 上，这样鼠标滑出拖拽条也能继续拖
+                    document.addEventListener('mousemove', doResize);
+                    document.addEventListener('mouseup', stopResize);
+                }
+
+                function doResize(event) {
+                    if (!isResizing.value) return;
+                    
+                    if (resizeType.value === 'sidebar') {
+                        // 计算左侧宽度，限制在 150px ~ 600px 之间
+                        let newWidth = event.clientX;
+                        if (newWidth < 150) newWidth = 150;
+                        if (newWidth > 600) newWidth = 600;
+                        sidebarWidth.value = newWidth;
+                    } else if (resizeType.value === 'pdf') {
+                        // 计算右侧宽度（屏幕总宽减去鼠标位置），限制在 200px ~ 800px 之间
+                        let newWidth = window.innerWidth - event.clientX;
+                        if (newWidth < 200) newWidth = 200;
+                        if (newWidth > 800) newWidth = 800;
+                        pdfWidth.value = newWidth;
+                    }
+                }
+
+                function stopResize() {
+                    isResizing.value = false;
+                    resizeType.value = null;
+                    document.removeEventListener('mousemove', doResize);
+                    document.removeEventListener('mouseup', stopResize);
+                }
 
                 // === 中文字典排序核心逻辑 ===
                 const cnOrder = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五"];
@@ -480,7 +537,8 @@
                     addChapter, addSection, deleteChapter, deleteSection, addQuestion, deleteQuestion,
                     renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, 
                     exportMarkdown, exportPDF,
-                    isSidebarOpen, isPdfOpen, currentPdfUrl
+                    isSidebarOpen, isPdfOpen, currentPdfUrl,
+                    sidebarWidth, pdfWidth, isResizing, resizeType, startResize
                 };
             }
         }).mount('#app');
