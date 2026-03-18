@@ -112,3 +112,25 @@ FOR EACH ROW
 EXECUTE FUNCTION log_question_update();
 ```
 当发生误操作时，进入 Supabase 左侧的 **Table Editor**，打开 `questions_history` 表。你会看到所有的修改历史都在这里，按时间排好了。找到那道题被改坏前的 `old_raw_md`，双击复制，然后回你的网页里重新粘贴保存即可。
+
+### 图片上传的权限问题
+
+1. 登录你的 Supabase 控制台，进入你的项目。
+
+2. 在左侧菜单栏点击 Storage。
+
+3. 在 Storage 页面左侧的菜单中，点击 Policies（策略）。
+
+4. 在右侧列表中找到你创建的 images 存储桶，点击它旁边的 New Policy 按钮。
+
+5. 在弹出的窗口中，选择 "For full customization"（完全自定义）或者 "Create a policy from scratch"。
+
+6. 按照以下设置填写：
+
+    - Policy name: 随便起个名字，比如 Allow public uploads
+
+    - Allowed operations: 勾选 INSERT（重要！这是允许上传的权限）
+
+    - Target roles: 点击下拉框，勾选 anon（代表允许匿名用户操作）
+
+7. 其它地方留空或者保持默认，直接点击右下角的 Review，然后点击 Save policy。
