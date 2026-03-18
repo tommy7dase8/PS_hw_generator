@@ -468,9 +468,15 @@
                     statusText.value = '⏳ 上传中...';
                     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${file.name.split('.').pop()}`;
                     const { error } = await supabaseClient.storage.from('images').upload(fileName, file);
-                    if (error) return alert('上传失败');
+                    if (error) { 
+                        alert('上传失败: ' + error.message); 
+                        statusText.value = '❌ 上传失败'; 
+                        return; 
+                    }
                     const { data: { publicUrl } } = supabaseClient.storage.from('images').getPublicUrl(fileName);
                     question.raw_md += `\n\n![](${publicUrl})\n\n`;
+                    // 💡 关键修复：主动通知 MathJax 重新渲染页面上的公式
+                    triggerMathJax();
                     saveQuestion(question);
                 }
 
