@@ -92,12 +92,13 @@ CREATE TABLE questions_history (
 
 -- 第 2 步：编写一个触发器函数（告诉数据库“当发生修改时，具体要做什么”）
 CREATE OR REPLACE FUNCTION log_question_update()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SECURITY DEFINER -- 新增这一行，赋予触发器最高执行权限
+AS $$
 BEGIN
     -- 只有当 raw_md 字段的内容真的发生了改变时，才记录（防止无意义的保存操作触发记录）
     IF OLD.raw_md IS DISTINCT FROM NEW.raw_md THEN
-        INSERT INTO questions_history (question_id, old_raw_md)
-        VALUES (OLD.id, OLD.raw_md);
+        INSERT INTO questions_history (question_id, old_raw_md) VALUES (OLD.id, OLD.raw_md);
     END IF;
     -- 返回新数据，允许正常的更新操作继续进行
     RETURN NEW;

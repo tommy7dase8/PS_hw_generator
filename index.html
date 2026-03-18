@@ -65,6 +65,26 @@
         .btn-pdf { background-color: #e67e22; color: white; }
         
         .preview-area { min-height: 50px; font-size: 16px; line-height: 1.7; color: #2c3e50; }
+    
+        /* 美化 Markdown 中的表格 */
+        .preview-area table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            background-color: #fff;
+        }
+        .preview-area th, .preview-area td {
+            border: 1px solid #dfe2e5;
+            padding: 10px 15px;
+            text-align: center;
+        }
+        .preview-area th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+        .preview-area tr:nth-child(2n) {
+            background-color: #fbfbfc; /* 隔行变色 */
+        }
     </style>
 </head>
 <body>
@@ -374,7 +394,14 @@
                 async function saveQuestion(question) {
                     statusText.value = '⏳ 保存中...';
                     const { error } = await supabaseClient.from('questions').update({ raw_md: question.raw_md }).eq('id', question.id);
-                    if (!error) { statusText.value = '✅ 保存成功'; question.isEditing = false; setTimeout(() => statusText.value = '✅ 云端数据同步成功', 2000); }
+                    if (error) { 
+                        alert("保存失败: " + error.message); // 弹出具体报错原因
+                        statusText.value = '❌ 保存失败'; 
+                    } else { 
+                        statusText.value = '✅ 保存成功'; 
+                        question.isEditing = false; 
+                        setTimeout(() => statusText.value = '✅ 云端数据同步成功', 2000); 
+                    }
                 }
 
                 // 图片上传
