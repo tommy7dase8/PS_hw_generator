@@ -472,14 +472,15 @@
                     triggerMathJax(); // 重新渲染公式
                 }
 
-                // === 新增：智能批量搜索解析 ===
+                // === 新增：智能批量实时搜索解析 ===
                 function executeSearch() {
+                    // 如果输入框空了，清空结果
                     if (!searchQuery.value.trim()) {
                         searchResults.value = [];
                         return;
                     }
                     
-                    // 每次搜索时，清空之前的选中状态（保证选中的全是本次搜索的结果）
+                    // 每次搜索时，清空之前的选中状态
                     allQuestions.value.forEach(q => q.selected = false);
                     
                     let results = [];
@@ -488,24 +489,40 @@
                     lines.forEach(line => {
                         if (!line.trim()) return;
                         
-                        // 用冒号（中英文皆可）分割“章节关键字”和“题号”
+                        // 用冒号（中英文皆可）分割
                         const parts = line.split(/[:：]/);
                         if (parts.length >= 2) {
                             const sectionKeyword = parts[0].trim();
-                            // 获取题号部分并用逗号、空格、顿号分割
+                            
+                            // 💡 核心改进 1：智能提取章节号
+                            // 从 "2.1 随机变量及其分布" 中提取出 "2.1"
+                            const secMatch = sectionKeyword.match(/(\d+\.\d+)/);
+                            // 如果提取到了(如 2.1)，就用 2.1 去匹配目录；如果没提取到，就原样匹配
+                            const secTarget = secMatch ? secMatch[1] : sectionKeyword; 
+                            
+                            // 获取题号部分
                             const numsStr = parts.slice(1).join(':'); 
                             const nums = numsStr.split(/[,，、\s]+/)
                                                 .map(n => parseInt(n))
                                                 .filter(n => !isNaN(n));
                             
-                            if (nums.length > 0 && sectionKeyword) {
+                            if (nums.length > 0 && secTarget) {
                                 // 遍历题库进行匹配
                                 allQuestions.value.forEach(q => {
-                                    // 模糊匹配章节名，且题号在数组中
-                                    if (q.chapter_title.includes(sectionKeyword) && nums.includes(q.question_order)) {
+                                    // 检查章节名是否包含提取出的数字（比如目录名 "第二章 - 2.1习题" 包含了 "2.1"）
+                                    const isChapterMatch = q.chapter_title.includes(secTarget);
+                                    
+                                    // 💡 核心改进 2：智能匹配题号
+                                    // 只要满足以下其一即可：1. 数据库里的题号顺序匹配； 2. Markdown文本物理上以 "数字." 或 "数字、" 开头
+                                    const isQuestionMatch = nums.some(num => {
+                                        const startsWithRegex = new RegExp(`^${num}[\\.\\s、]`);
+                                        return q.question_order === num || startsWithRegex.test(q.raw_md.trim());
+                                    });
+
+                                    if (isChapterMatch && isQuestionMatch) {
                                         q.selected = true; // 自动打上选中勾
                                         
-                                        // 避免重复推入结果集
+                                        // 避免重复推入
                                         if (!results.find(r => r.id === q.id)) {
                                             results.push(q);
                                         }
@@ -515,7 +532,7 @@
                         }
                     });
                     
-                    // 将结果按章节和题号排序显示
+                    // 排序结果
                     results.sort((a, b) => {
                         if (a.chapter_title === b.chapter_title) {
                             return a.question_order - b.question_order;
@@ -526,7 +543,6 @@
                     searchResults.value = results;
                     triggerMathJax(); // 触发公式渲染
                 }
-
                 // === 中文字典排序核心逻辑 ===
                 const cnOrder = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五"];
                 function getChapterWeight(name) {
