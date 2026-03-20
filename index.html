@@ -577,7 +577,7 @@
                         const response = await fetch(llmApiUrl, {
                             method: 'POST',
                             // headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmApiKey}` },
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_URL}` },
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseUrl}` },
                             body: JSON.stringify(payload)
                         });
 
