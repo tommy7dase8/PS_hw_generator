@@ -196,7 +196,7 @@
         <div id="toolbar">
             <div class="toolbar-left">
                 <button class="btn btn-toggle" v-show="currentView === 'workspace'" @click="isSidebarOpen = !isSidebarOpen" title="折叠/展开目录">☰</button>
-                <button class="btn btn-toggle" @click="goToHome" title="返回首页" style="font-size: 14px;">🏠 Home</button>
+                <button class="btn btn-toggle" v-show="currentView === 'workspace'" @click="goToHome" title="返回首页" style="font-size: 14px;">🏠 Home</button>
                 <span style="font-weight: bold; font-size: 16px; margin-left: 10px;">{{ statusText }}</span>
             </div>
             <div class="toolbar-right">
@@ -494,6 +494,9 @@
 
                 // === 新增：智能批量实时搜索解析 ===
                 function executeSearch() {
+                    // 每次执行匹配或清空时，先无条件取消所有题目的勾选
+                    allQuestions.value.forEach(q => q.selected = false);
+
                     // 如果输入框空了，清空结果
                     if (!searchQuery.value.trim()) {
                         searchResults.value = [];
@@ -530,7 +533,13 @@
                                 // 遍历题库进行匹配
                                 allQuestions.value.forEach(q => {
                                     // 检查章节名是否包含提取出的数字（比如目录名 "第二章 - 2.1习题" 包含了 "2.1"）
-                                    const isChapterMatch = q.chapter_title.includes(secTarget);
+                                    //const isChapterMatch = q.chapter_title.includes(secTarget);
+                                    // 💡 改进后的判断逻辑：
+                                    // 1. 如果用户输入的关键词（如 "2.1补充"）在目录名中完全存在，优先匹配
+                                    // 2. 如果完全匹配失败，再看目录名是否同时包含数字（如 "2.1"）和用户输入的其他文字
+                                    const isChapterMatch = q.chapter_title.includes(sectionKeyword) || 
+                                        (q.chapter_title.includes(secTarget) && 
+                                        sectionKeyword.split(secTarget).every(part => q.chapter_title.includes(part.trim())));
                                     
                                     // 💡 核心改进 2：智能匹配题号
                                     // 只要满足以下其一即可：1. 数据库里的题号顺序匹配； 2. Markdown文本物理上以 "数字." 或 "数字、" 开头
