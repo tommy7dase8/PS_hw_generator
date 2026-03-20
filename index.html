@@ -142,6 +142,31 @@
         }
         .tooltip-container:hover .tooltip-content { visibility: visible; opacity: 1; }
         .tooltip-content code { background: rgba(255,255,255,0.2); padding: 2px 4px; border-radius: 3px; font-family: monospace; color: #f1c40f;}
+
+        /* === 新增：预览卡片删除按钮样式 === */
+        .remove-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            background: #fdf2f2;
+            color: #e74c3c;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+            border: 1px solid #fadbd8;
+            z-index: 5;
+        }
+        .remove-btn:hover {
+            background: #e74c3c;
+            color: white;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
@@ -261,6 +286,7 @@
                     <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 15px; text-align: left;">
                         
                         <div v-for="q in searchResults" :key="q.id" class="question-card" style="margin-bottom: 0; border-left: 4px solid #3498db; height: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column;">
+                            <div class="remove-btn" @click="removeFromSelection(q)" title="从导出清单中移除">×</div>
                             <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 10px; font-weight: bold; flex-shrink: 0;">
                                 📍 所属：{{ q.chapter_title }} —— 第 {{ getRealQuestionNum(q.raw_md) || q.question_order }} 题
                             </div>
@@ -539,9 +565,15 @@
                                     
                                     // 💡 核心改进 2：智能匹配题号
                                     // 只要满足以下其一即可：1. 数据库里的题号顺序匹配； 2. Markdown文本物理上以 "数字." 或 "数字、" 开头
+                                    // const isQuestionMatch = nums.some(num => {
+                                    //     const startsWithRegex = new RegExp(`^${num}[\\.\\s、]`);
+                                    //     return q.question_order === num || startsWithRegex.test(q.raw_md.trim());
+                                    // });
+
                                     const isQuestionMatch = nums.some(num => {
-                                        const startsWithRegex = new RegExp(`^${num}[\\.\\s、]`);
-                                        return q.question_order === num || startsWithRegex.test(q.raw_md.trim());
+                                        // 💡 只有当提取出的“真实题号”完全等于你输入的数字时才匹配
+                                        const realNum = getRealQuestionNum(q.raw_md);
+                                        return parseInt(realNum) === num;
                                     });
 
                                     if (isChapterMatch && isQuestionMatch) {
@@ -568,6 +600,16 @@
                     searchResults.value = results;
                     triggerMathJax(); // 触发公式渲染
                 }
+                
+                // === 新增：从预览/选中列表中手动移除某道题 ===
+                function removeFromSelection(question) {
+                    // 1. 从底层的总题库里取消选中（这样右上角的导出数量会同步减少）
+                    question.selected = false;
+                    
+                    // 2. 从当前的预览结果数组中过滤掉这一项（这样卡片会立即消失）
+                    searchResults.value = searchResults.value.filter(item => item.id !== question.id);
+                }
+
                 // === 中文字典排序核心逻辑 ===
                 const cnOrder = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五"];
                 function getChapterWeight(name) {
@@ -968,7 +1010,7 @@
                     triggerModalUpload, runOCR, applyAIText, confirmAddQuestion,
                     currentView, searchQuery, searchResults, 
                     goToHome, openWorkspace, executeSearch,
-                    expandedChapters, toggleChapter
+                    expandedChapters, toggleChapter, removeFromSelection
                 };
             }
         }).mount('#app');
