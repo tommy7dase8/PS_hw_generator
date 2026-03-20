@@ -112,6 +112,32 @@
         .image-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .ai-result-box { flex: 1; display: flex; flex-direction: column; gap: 10px; }
         .ai-textarea { flex: 1; width: 100%; resize: none; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: monospace; }
+
+        /* === 新增：首页与搜索提示框样式 === */
+        #home-view {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            overflow-y: auto;
+            background-color: #f5f7fa;
+        }
+        
+        .tooltip-container { position: relative; display: inline-block; cursor: help; }
+        .tooltip-trigger { 
+            color: #e67e22; font-size: 13px; font-weight: bold; 
+            background: #fff3e0; padding: 4px 10px; border-radius: 12px; 
+            border: 1px solid #f39c12;
+        }
+        .tooltip-content { 
+            visibility: hidden; width: 280px; background-color: #2c3e50; color: #ecf0f1; 
+            text-align: left; border-radius: 6px; padding: 12px; position: absolute; 
+            z-index: 10; top: 130%; right: 0; font-size: 13px; line-height: 1.6;
+            opacity: 0; transition: opacity 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .tooltip-container:hover .tooltip-content { visibility: visible; opacity: 1; }
+        .tooltip-content code { background: rgba(255,255,255,0.2); padding: 2px 4px; border-radius: 3px; font-family: monospace; color: #f1c40f;}
     </style>
 </head>
 <body>
@@ -166,6 +192,7 @@
         <div id="toolbar">
             <div class="toolbar-left">
                 <button class="btn btn-toggle" @click="isSidebarOpen = !isSidebarOpen" title="折叠/展开目录">☰</button>
+                <button class="btn btn-toggle" @click="goToHome" title="返回首页" style="font-size: 14px;">🏠 Home</button>
                 <span style="font-weight: bold; font-size: 16px; margin-left: 10px;">{{ statusText }}</span>
             </div>
             <div class="toolbar-right">
@@ -183,83 +210,130 @@
         </div>
 
         <div id="app-container" :class="{ 'no-select': isResizing }">
-            <div id="sidebar" v-show="isSidebarOpen" :style="{ width: sidebarWidth + 'px', maxWidth: '40vw' }">
-                <div class="sidebar-header">
-                    课本习题目录树
-                    <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
-                </div>
-                
-                <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
-                    <div class="chapter-title">
-                        <span @click="chap.expanded = !chap.expanded">
-                            {{ chap.expanded ? '📂' : '📁' }} {{ chap.name }}
-                        </span>
-                        <div>
-                            <button class="icon-btn" title="新增二级题集" @click.stop="addSection(chap.name)">➕</button>
-                            <button class="icon-btn" title="删除整个章节" @click.stop="deleteChapter(chap.name)">🗑️</button>
-                        </div>
-                    </div>
-                    
-                    <div v-show="chap.expanded">
-                        <div 
-                            v-for="sec in chap.sections" 
-                            :key="sec.name"
-                            class="section-item"
-                            :class="{ active: currentSelection === (chap.name + ' - ' + sec.name) }"
-                            @click="selectSection(chap.name, sec.name)"
-                        >
-                            <span>📄 {{ sec.name }}</span>
-                            <button class="icon-btn" title="删除题集" @click.stop="deleteSection(chap.name, sec.name)">❌</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
             
-            <div class="resizer" v-show="isSidebarOpen" @mousedown="startResize('sidebar', $event)" :class="{ active: resizeType === 'sidebar' }"></div>
-
-            <div id="main-content" v-if="currentQuestions">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                    <h2 style="margin: 0; color: #2c3e50;">{{ currentSelection }}</h2>
-                    <button class="btn btn-primary" @click="openAddModal">➕ 添加新题目</button>
-                </div>
+            <div id="home-view" v-if="currentView === 'home'">
+                <h1 style="color: #2c3e50; margin-bottom: 40px; font-size: 32px;">📚 Markdown 习题管理器</h1>
                 
-                <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
-                    <div class="question-header">
-                        <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
-                        <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 15px; color:#555;">加入导出清单</label>
-                        <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ {{ q.isEditing ? '收起编辑' : '修改原代码' }}</button>
-                        <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除</button>
+                <div style="display: flex; gap: 30px; margin-bottom: 30px; align-items: stretch; width: 800px; max-width: 90%;">
+                    <div style="display: flex; flex-direction: column; justify-content: center;">
+                        <button class="btn btn-primary" style="padding: 20px 30px; font-size: 18px; border-radius: 12px; height: 100%; box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);" @click="openWorkspace">
+                            📂 打开详细<br>目录树
+                        </button>
                     </div>
                     
-                    <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
-                    
-                    <div class="editor-container" v-show="q.isEditing">
-                        <div style="margin-bottom: 10px;">
-                            <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
-                            <button class="btn" style="background:#7f8c8d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
-                            <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改到云端</button>
+                    <div style="flex: 1; display: flex; flex-direction: column; position: relative;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <label style="font-weight: bold; color: #34495e; font-size: 16px;">🔍 智能批量选题</label>
+                            <div class="tooltip-container">
+                                <span class="tooltip-trigger">❓ 搜索规则</span>
+                                <div class="tooltip-content">
+                                    输入格式：<br>
+                                    <code>章节关键词：题号1、题号2</code><br>
+                                    支持多行输入，支持中文冒号和顿号。<br><br>
+                                    <strong>示例：</strong><br>
+                                    2.1 随机变量：2、4、7、8<br>
+                                    2.4 常用离散分布：1, 8, 10
+                                </div>
+                            </div>
                         </div>
-                        <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
+                        <textarea v-model="searchQuery" @input="executeSearch" placeholder="请粘贴题目清单，例如：&#10;2.1 随机变量及其分布：2、4、7、8&#10;2.4 常用离散分布：1、7、8、9、10" style="width: 100%; height: 150px; padding: 15px; border-radius: 8px; border: 2px solid #3498db; resize: vertical; font-size: 15px; font-family: inherit; box-sizing: border-box; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"></textarea>
                     </div>
                 </div>
-                
-                <div v-if="currentQuestions.length === 0" style="text-align:center; color:#95a5a6; margin-top: 50px; padding: 40px; background: white; border-radius: 8px;">
-                    这个题集目前没有题目，点击右上角添加吧！
+
+                <div v-if="searchResults.length > 0" style="width: 800px; max-width: 90%; margin-top: 20px;">
+                    <h3 style="color: #27ae60; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        ✅ 已自动选中以下 {{ searchResults.length }} 道题 (随时可点击上方按钮导出)：
+                    </h3>
+                    <div v-for="q in searchResults" :key="q.id" class="question-card" style="margin-bottom: 15px; border-left: 4px solid #3498db;">
+                        <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 10px; font-weight: bold;">
+                            📍 所属：{{ q.chapter_title }} —— 第 {{ q.question_order }} 题
+                        </div>
+                        <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
+                    </div>
                 </div>
             </div>
 
-            <div id="pdf-panel" v-show="isPdfOpen" :style="{ width: pdfWidth + 'px', maxWidth: '50vw' }">
-                <div class="pdf-header">
-                    <span>📑 参考文档 ({{ currentSelection.split(' - ')[1] || '无' }})</span>
-                    <button class="icon-btn" style="font-size: 16px;" @click="isPdfOpen = false">✖</button>
+            <template v-else>
+
+                <div id="sidebar" v-show="isSidebarOpen" :style="{ width: sidebarWidth + 'px', maxWidth: '40vw' }">
+                    <div class="sidebar-header">
+                        课本习题目录树
+                        <button class="icon-btn" title="新增一级章节" @click="addChapter">➕</button>
+                    </div>
+                    
+                    <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
+                        <div class="chapter-title">
+                            <span @click="chap.expanded = !chap.expanded">
+                                {{ chap.expanded ? '📂' : '📁' }} {{ chap.name }}
+                            </span>
+                            <div>
+                                <button class="icon-btn" title="新增二级题集" @click.stop="addSection(chap.name)">➕</button>
+                                <button class="icon-btn" title="删除整个章节" @click.stop="deleteChapter(chap.name)">🗑️</button>
+                            </div>
+                        </div>
+                        
+                        <div v-show="chap.expanded">
+                            <div 
+                                v-for="sec in chap.sections" 
+                                :key="sec.name"
+                                class="section-item"
+                                :class="{ active: currentSelection === (chap.name + ' - ' + sec.name) }"
+                                @click="selectSection(chap.name, sec.name)"
+                            >
+                                <span>📄 {{ sec.name }}</span>
+                                <button class="icon-btn" title="删除题集" @click.stop="deleteSection(chap.name, sec.name)">❌</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <iframe v-if="currentPdfUrl" :src="currentPdfUrl" style="flex: 1; border: none; width: 100%;"></iframe>
-                <div v-else style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #7f8c8d; text-align: center;">
-                    <span style="font-size: 40px; margin-bottom: 10px;">📄</span>
-                    <p>当前题集没有配置关联的 PDF。</p>
-                    <p style="font-size: 12px;">请在根目录的 <code>pdf_mapping.json</code> 中配置映射。</p>
+                
+                <div class="resizer" v-show="isSidebarOpen" @mousedown="startResize('sidebar', $event)" :class="{ active: resizeType === 'sidebar' }"></div>
+
+                <div id="main-content" v-if="currentQuestions">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <h2 style="margin: 0; color: #2c3e50;">{{ currentSelection }}</h2>
+                        <button class="btn btn-primary" @click="openAddModal">➕ 添加新题目</button>
+                    </div>
+                    
+                    <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
+                        <div class="question-header">
+                            <input type="checkbox" :id="'check-'+q.id" v-model="q.selected">
+                            <label :for="'check-'+q.id" style="flex:1; cursor:pointer; font-size: 15px; color:#555;">加入导出清单</label>
+                            <button class="btn btn-edit" @click="q.isEditing = !q.isEditing">✏️ {{ q.isEditing ? '收起编辑' : '修改原代码' }}</button>
+                            <button class="btn btn-danger" @click="deleteQuestion(q.id)">🗑️ 删除</button>
+                        </div>
+                        
+                        <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
+                        
+                        <div class="editor-container" v-show="q.isEditing">
+                            <div style="margin-bottom: 10px;">
+                                <input type="file" :id="'file-' + q.id" style="display: none" @change="uploadImage($event, q)" accept="image/*">
+                                <button class="btn" style="background:#7f8c8d; color:white; margin-right: 10px;" @click="triggerUpload(q.id)">🖼️ 插入图片</button>
+                                <button class="btn btn-save" @click="saveQuestion(q)">💾 保存修改到云端</button>
+                            </div>
+                            <textarea class="md-editor" v-model="q.raw_md" @input="debouncedRender"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div v-if="currentQuestions.length === 0" style="text-align:center; color:#95a5a6; margin-top: 50px; padding: 40px; background: white; border-radius: 8px;">
+                        这个题集目前没有题目，点击右上角添加吧！
+                    </div>
                 </div>
-            </div>
+
+                <div id="pdf-panel" v-show="isPdfOpen" :style="{ width: pdfWidth + 'px', maxWidth: '50vw' }">
+                    <div class="pdf-header">
+                        <span>📑 参考文档 ({{ currentSelection.split(' - ')[1] || '无' }})</span>
+                        <button class="icon-btn" style="font-size: 16px;" @click="isPdfOpen = false">✖</button>
+                    </div>
+                    <iframe v-if="currentPdfUrl" :src="currentPdfUrl" style="flex: 1; border: none; width: 100%;"></iframe>
+                    <div v-else style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #7f8c8d; text-align: center;">
+                        <span style="font-size: 40px; margin-bottom: 10px;">📄</span>
+                        <p>当前题集没有配置关联的 PDF。</p>
+                        <p style="font-size: 12px;">请在根目录的 <code>pdf_mapping.json</code> 中配置映射。</p>
+                    </div>
+                </div>
+
+            </template>
         </div>
     </div>
 
@@ -343,6 +417,12 @@
                 const isResizing = ref(false);
                 const resizeType = ref(null);
 
+                // === 新增：页面视图与搜索状态 ===
+                const currentView = ref('home'); // 'home' 或 'workspace'
+                const searchQuery = ref('');
+                const searchResults = ref([]);
+
+
                 function startResize(type, event) {
                     isResizing.value = true;
                     resizeType.value = type;
@@ -374,6 +454,77 @@
                     resizeType.value = null;
                     document.removeEventListener('mousemove', doResize);
                     document.removeEventListener('mouseup', stopResize);
+                }
+
+                // === 新增：页面切换方法 ===
+                function goToHome() {
+                    currentView.value = 'home';
+                    isSidebarOpen.value = false; // 返回首页时折叠左侧，下次打开更清晰
+                }
+
+                function openWorkspace() {
+                    currentView.value = 'workspace';
+                    isSidebarOpen.value = true;
+                    // 如果尚未选择任何章节，默认选中第一个
+                    if (!currentSelection.value && chapters.value.length > 0 && chapters.value[0].sections.length > 0) {
+                        currentSelection.value = `${chapters.value[0].name} - ${chapters.value[0].sections[0].name}`;
+                    }
+                    triggerMathJax(); // 重新渲染公式
+                }
+
+                // === 新增：智能批量搜索解析 ===
+                function executeSearch() {
+                    if (!searchQuery.value.trim()) {
+                        searchResults.value = [];
+                        return;
+                    }
+                    
+                    // 每次搜索时，清空之前的选中状态（保证选中的全是本次搜索的结果）
+                    allQuestions.value.forEach(q => q.selected = false);
+                    
+                    let results = [];
+                    const lines = searchQuery.value.split('\n');
+                    
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        
+                        // 用冒号（中英文皆可）分割“章节关键字”和“题号”
+                        const parts = line.split(/[:：]/);
+                        if (parts.length >= 2) {
+                            const sectionKeyword = parts[0].trim();
+                            // 获取题号部分并用逗号、空格、顿号分割
+                            const numsStr = parts.slice(1).join(':'); 
+                            const nums = numsStr.split(/[,，、\s]+/)
+                                                .map(n => parseInt(n))
+                                                .filter(n => !isNaN(n));
+                            
+                            if (nums.length > 0 && sectionKeyword) {
+                                // 遍历题库进行匹配
+                                allQuestions.value.forEach(q => {
+                                    // 模糊匹配章节名，且题号在数组中
+                                    if (q.chapter_title.includes(sectionKeyword) && nums.includes(q.question_order)) {
+                                        q.selected = true; // 自动打上选中勾
+                                        
+                                        // 避免重复推入结果集
+                                        if (!results.find(r => r.id === q.id)) {
+                                            results.push(q);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    
+                    // 将结果按章节和题号排序显示
+                    results.sort((a, b) => {
+                        if (a.chapter_title === b.chapter_title) {
+                            return a.question_order - b.question_order;
+                        }
+                        return a.chapter_title.localeCompare(b.chapter_title);
+                    });
+                    
+                    searchResults.value = results;
+                    triggerMathJax(); // 触发公式渲染
                 }
 
                 // === 中文字典排序核心逻辑 ===
@@ -455,12 +606,14 @@
                     }
                     allQuestions.value = data.map(q => ({ ...q, selected: false, isEditing: false }));
                     
-                    if (allQuestions.value.length > 0 && !currentSelection.value) {
-                        // 初始加载时默认选中排序后的第一个章的第一个节
-                        if (chapters.value.length > 0 && chapters.value[0].sections.length > 0) {
-                            currentSelection.value = `${chapters.value[0].name} - ${chapters.value[0].sections[0].name}`;
-                        }
-                    }
+                    // if (allQuestions.value.length > 0 && !currentSelection.value) {
+                    //     // 初始加载时默认选中排序后的第一个章的第一个节
+                    //     if (chapters.value.length > 0 && chapters.value[0].sections.length > 0) {
+                    //         currentSelection.value = `${chapters.value[0].name} - ${chapters.value[0].sections[0].name}`;
+                    //     }
+                    // }
+
+
                     statusText.value = '✅ 云端数据同步成功';
                     triggerMathJax();
                 }
@@ -741,7 +894,9 @@
                     isSidebarOpen, isPdfOpen, currentPdfUrl,
                     sidebarWidth, pdfWidth, isResizing, resizeType, startResize,
                     showModal, modalData, openAddModal, handleModalImageUpload, 
-                    triggerModalUpload, runOCR, applyAIText, confirmAddQuestion
+                    triggerModalUpload, runOCR, applyAIText, confirmAddQuestion,
+                    currentView, searchQuery, searchResults, 
+                    goToHome, openWorkspace, executeSearch
                 };
             }
         }).mount('#app');
