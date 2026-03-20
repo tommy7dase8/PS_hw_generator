@@ -194,7 +194,7 @@
 
         <div id="toolbar">
             <div class="toolbar-left">
-                <button class="btn btn-toggle" @click="isSidebarOpen = !isSidebarOpen" title="折叠/展开目录">☰</button>
+                <button class="btn btn-toggle" v-show="currentView === 'workspace'" @click="isSidebarOpen = !isSidebarOpen" title="折叠/展开目录">☰</button>
                 <button class="btn btn-toggle" @click="goToHome" title="返回首页" style="font-size: 14px;">🏠 Home</button>
                 <span style="font-weight: bold; font-size: 16px; margin-left: 10px;">{{ statusText }}</span>
             </div>
@@ -280,8 +280,8 @@
                     
                     <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
                         <div class="chapter-title">
-                            <span @click="chap.expanded = !chap.expanded">
-                                {{ chap.expanded ? '📂' : '📁' }} {{ chap.name }}
+                            <span @click="toggleChapter(chap.name)">
+                                {{ expandedChapters[chap.name] ? '📂' : '📁' }} {{ chap.name }}
                             </span>
                             <div>
                                 <button class="icon-btn" title="新增二级题集" @click.stop="addSection(chap.name)">➕</button>
@@ -289,7 +289,7 @@
                             </div>
                         </div>
                         
-                        <div v-show="chap.expanded">
+                        <div v-show="expandedChapters[chap.name]">
                             <div 
                                 v-for="sec in chap.sections" 
                                 :key="sec.name"
@@ -577,6 +577,11 @@
                     return match ? parseFloat(match[1]) : 999;
                 }
 
+                // === 新增：用独立对象记录每个章节的展开/折叠状态 ===
+                const expandedChapters = ref({});
+
+
+                // === 优化：章节目录生成逻辑（剥离了原有的强制 expanded 属性） ===
                 const chapters = computed(() => {
                     const tree = {};
                     allQuestions.value.forEach(q => {
@@ -584,7 +589,10 @@
                         const chapName = parts[0] || '未分类';
                         const secName = parts[1] || '默认题集';
                         
-                        if (!tree[chapName]) tree[chapName] = { name: chapName, expanded: true, sections: {} };
+                        // 首次遍历到该章节时，只记录结构，不强行设定展开状态
+                        if (!tree[chapName]) {
+                            tree[chapName] = { name: chapName, sections: {} }; 
+                        }
                         if (!tree[chapName].sections[secName]) tree[chapName].sections[secName] = { name: secName };
                     });
                     
@@ -599,6 +607,12 @@
                         return getChapterWeight(a.name) - getChapterWeight(b.name) || a.name.localeCompare(b.name);
                     });
                 });
+
+                // === 新增：切换章节折叠状态的方法 ===
+                function toggleChapter(chapName) {
+                    // 如果尚未记录，则默认为 false(折叠)，取反后变成 true(展开)
+                    expandedChapters.value[chapName] = !expandedChapters.value[chapName];
+                }
 
                 const currentQuestions = computed(() => {
                     return allQuestions.value.filter(q => q.chapter_title === currentSelection.value).sort((a, b) => a.question_order - b.question_order);
@@ -947,7 +961,8 @@
                     showModal, modalData, openAddModal, handleModalImageUpload, 
                     triggerModalUpload, runOCR, applyAIText, confirmAddQuestion,
                     currentView, searchQuery, searchResults, 
-                    goToHome, openWorkspace, executeSearch
+                    goToHome, openWorkspace, executeSearch,
+                    expandedChapters, toggleChapter
                 };
             }
         }).mount('#app');
