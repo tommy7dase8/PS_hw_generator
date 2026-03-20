@@ -25,7 +25,7 @@ jobs:
           sed -i 's|{{SUPABASE_KEY}}|${{ secrets.SUPABASE_KEY }}|g' index.html
           sed -i 's|{{LLM_API_KEY}}|${{ secrets.LLM_API_KEY }}|g' index.html
           sed -i 's|{{LLM_API_URL}}|${{ secrets.LLM_API_URL }}|g' index.html
-          sed -i 's|{{SUPA_JWT_KEY}}|${{ secrets.SUPA_JWT_KEY }}|g' index.html
+          sed -i 's|{{SUPABASE_ANON_KEY}}|${{ secrets.SUPABASE_ANON_KEY }}|g' index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5 # 已升级
