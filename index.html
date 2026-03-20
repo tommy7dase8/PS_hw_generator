@@ -257,13 +257,15 @@
                         ✅ 已自动选中以下 {{ searchResults.length }} 道题 (随时可点击上方按钮导出)：
                     </h3>
                     
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 20px; margin-top: 15px; text-align: left;">
-                        <div v-for="q in searchResults" :key="q.id" class="question-card" style="margin-bottom: 0; border-left: 4px solid #3498db; height: 100%; box-sizing: border-box;">
-                            <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 10px; font-weight: bold;">
-                                📍 所属：{{ q.chapter_title }} —— 第 {{ q.question_order }} 题
+                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 15px; text-align: left;">
+                        
+                        <div v-for="q in searchResults" :key="q.id" class="question-card" style="margin-bottom: 0; border-left: 4px solid #3498db; height: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column;">
+                            <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 10px; font-weight: bold; flex-shrink: 0;">
+                                📍 所属：{{ q.chapter_title }} —— 第 {{ getRealQuestionNum(q.raw_md) || q.question_order }} 题
                             </div>
-                            <div class="preview-area" v-html="renderMarkdown(q.raw_md)"></div>
+                            <div class="preview-area" v-html="renderQuestionOnly(q.raw_md)" style="overflow-x: auto; flex: 1;"></div>
                         </div>
+
                     </div>
                 </div>
             </div>
@@ -823,6 +825,22 @@
                     else { setTimeout(triggerMathJax, 100); }
                 };
 
+                // === 新增：只截取题目部分进行渲染（去掉“解”或“证”及后面的内容） ===
+                function renderQuestionOnly(md) {
+                    const i = md.search(/^解|^证/m); // 寻找以“解”或“证”开头的行
+                    const questionMd = i !== -1 ? md.substring(0, i).trim() : md;
+                    return marked.parse(questionMd);
+                }
+
+                // === 新增：从 Markdown 文本开头智能提取真实题号 ===
+                function getRealQuestionNum(md) {
+                    if (!md) return '';
+                    // 匹配字符串开头可能存在的空白符，然后提取相连的数字，直到遇到 点、顿号 或 空格
+                    const match = md.trim().match(/^(\d+)[.、\s]/);
+                    // 如果提取到了真正的数字就返回，否则返回空
+                    return match ? match[1] : '';
+                }
+
                 async function saveQuestion(question) {
                     statusText.value = '⏳ 保存中...';
                     const { error } = await supabaseClient.from('questions').update({ raw_md: question.raw_md }).eq('id', question.id);
@@ -922,7 +940,7 @@
                 return {
                     statusText, chapters, currentSelection, currentQuestions, selectSection, selectedCount, 
                     addChapter, addSection, deleteChapter, deleteSection, addQuestion, deleteQuestion,
-                    renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, 
+                    renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, renderQuestionOnly, getRealQuestionNum, 
                     exportMarkdown, exportPDF,
                     isSidebarOpen, isPdfOpen, currentPdfUrl,
                     sidebarWidth, pdfWidth, isResizing, resizeType, startResize,
