@@ -165,6 +165,7 @@ EXECUTE FUNCTION log_question_update();
 9. 保持 JWT Verification 开启，点击创建。
 10. 点击右上角的 **Deploy**。
 11. 部署完成后，你会在这个函数的详情页看到一个类似于 `https://<你的项目ID>.supabase.co/functions/v1/ocr-proxy` 的 URL。复制它，替换github secret key里面的LLM_API_URL
+12. index.html里面runOCR这个函数也别忘了改: `Bearer ${llmApiKey}` 这句话改成 `Bearer ${SUPABASE_URL}`
 
 ### 💻 核心代码存档
 
