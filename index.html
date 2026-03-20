@@ -100,16 +100,78 @@
 
         /* 新增：拖拽时防止文本被意外选中变蓝 */
         .no-select { user-select: none; }
+
+        /* === 新增：模态弹窗样式 === */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.6); z-index: 1000; display: flex; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; width: 90vw; max-width: 1200px; height: 85vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; }
+        .modal-body { display: flex; flex: 1; overflow: hidden; }
+        .modal-left, .modal-right { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        .modal-left { border-right: 1px solid #eee; }
+        .image-preview-box { flex: 1; border: 2px dashed #ccc; border-radius: 6px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; background: #f9f9f9; min-height: 200px; }
+        .image-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .ai-result-box { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        .ai-textarea { flex: 1; width: 100%; resize: none; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: monospace; }
     </style>
 </head>
 <body>
     <div id="app">
+        <div class="modal-overlay" v-if="showModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 style="margin:0;">✨ 添加新题目 (AI OCR 辅助)</h3>
+                    <button class="icon-btn" style="font-size:20px;" @click="showModal = false">✖</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-left">
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <label style="font-weight:bold; color: #2c3e50;">📝 Markdown 编辑器</label>
+                            <textarea class="md-editor" v-model="modalData.raw_md" @input="debouncedRender" style="flex: 1; height: auto;"></textarea>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 15px;">
+                            <label style="font-weight:bold; color: #2c3e50;">👁️ 效果预览</label>
+                            <div class="preview-area" style="flex:1; overflow-y:auto; border: 1px dashed #ccc; padding: 15px; border-radius: 4px; background: white;" v-html="renderMarkdown(modalData.raw_md)"></div>
+                        </div>
+                    </div>
+                    <div class="modal-right">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label style="font-weight:bold; color: #2c3e50;">🖼️ 上传题目图片 (支持 Ctrl+V / Cmd+V 粘贴)</label>
+                            <input type="file" id="modal-file-upload" style="display: none" @change="handleModalImageUpload" accept="image/*">
+                            <button class="btn btn-primary" style="background-color: #7f8c8d;" @click="triggerModalUpload">📁 从电脑选择</button>
+                        </div>
+                        <div class="image-preview-box">
+                            <img v-if="modalData.imagePreviewUrl" :src="modalData.imagePreviewUrl" />
+                            <span v-else style="color:#999; text-align: center; line-height: 1.5;">在此处点击并按 Cmd/Ctrl+V 粘贴图片<br>或点击上方按钮选择</span>
+                        </div>
+                        <div class="ai-result-box">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-weight:bold; color: #2c3e50;">🤖 AI 识别结果</label>
+                                <button class="btn btn-export" :disabled="!modalData.imageBase64 || modalData.isProcessing" @click="runOCR">
+                                    {{ modalData.isProcessing ? '⏳ 正在调用大模型...' : '⚡ 开始 AI OCR' }}
+                                </button>
+                            </div>
+                            <textarea class="ai-textarea" v-model="modalData.aiResult" placeholder="AI 识别的 Markdown 文本将显示在这里..."></textarea>
+                            <button class="btn btn-edit" @click="applyAIText" :disabled="!modalData.aiResult">⬅️ 追加到左侧编辑器</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-header" style="justify-content: flex-end; gap: 15px; background: white; border-top: 1px solid #eee; border-bottom: none;">
+                    <button class="btn" style="background:#e0e0e0; color:#333;" @click="showModal = false">取消</button>
+                    <button class="btn btn-save" @click="confirmAddQuestion">💾 确认添加至题库</button>
+                </div>
+            </div>
+        </div>
+
+
         <div id="toolbar">
             <div class="toolbar-left">
                 <button class="btn btn-toggle" @click="isSidebarOpen = !isSidebarOpen" title="折叠/展开目录">☰</button>
                 <span style="font-weight: bold; font-size: 16px; margin-left: 10px;">{{ statusText }}</span>
             </div>
             <div class="toolbar-right">
+                <span v-show="selectedCount > 0" style="margin-right: 15px; font-weight: bold; color: #f1c40f;">
+                    已选择 {{ selectedCount }} 题
+                </span>
                 <button class="btn btn-export" @click="exportMarkdown(true)">⬇️ 导出 MD (带答案)</button>
                 <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 导出 MD (纯题)</button>
                 <button class="btn btn-pdf" @click="exportPDF(true)">🖨️ 导出 PDF (带答案)</button>
@@ -158,7 +220,7 @@
             <div id="main-content" v-if="currentQuestions">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                     <h2 style="margin: 0; color: #2c3e50;">{{ currentSelection }}</h2>
-                    <button class="btn btn-primary" @click="addQuestion">➕ 添加新题目</button>
+                    <button class="btn btn-primary" @click="openAddModal">➕ 添加新题目</button>
                 </div>
                 
                 <div v-for="(q, qIndex) in currentQuestions" :key="q.id" class="question-card">
@@ -253,6 +315,13 @@
             setup() {
                 const supabaseUrl = '{{SUPABASE_URL}}';
                 const supabaseKey = '{{SUPABASE_KEY}}';
+                // === 新增：LLM API 配置 ===
+                const llmApiKey = '{{LLM_API_KEY}}';
+                const llmApiUrl = '{{LLM_API_URL}}';
+                // === 新增：弹窗状态管理 ===
+                const showModal = ref(false);
+                const modalData = ref({ raw_md: '', imagePreviewUrl: null, imageBase64: null, aiResult: '', isProcessing: false });
+
                 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
                 const statusText = ref('正在连接云端数据库...');
@@ -352,10 +421,16 @@
                 const currentPdfUrl = computed(() => {
                     return pdfMapping.value[currentSelection.value] || '';
                 });
+                const selectedCount = computed(() => {
+                    return allQuestions.value.filter(q => q.selected).length;
+                });
 
                 onMounted(async () => {
                     await loadData();
                     await loadPdfMapping(); // 加载 JSON 映射
+
+                    // 新增：全局监听粘贴事件
+                    window.addEventListener('paste', handlePaste);
                 });
 
                 // 读取同目录下的 pdf_mapping.json
@@ -437,6 +512,118 @@
                     const { error } = await supabaseClient.from('questions').delete().eq('id', id);
                     if (!error) await loadData();
                 }
+
+                // === 新增：模态框相关操作逻辑 ===
+                function openAddModal() {
+                    if (!currentSelection.value) return alert("请先在左侧选择一个题集");
+                    modalData.value = { raw_md: '', imagePreviewUrl: null, imageBase64: null, aiResult: '', isProcessing: false };
+                    showModal.value = true;
+                }
+
+                function handlePaste(e) {
+                    if (!showModal.value) return; // 只有弹窗打开时才接管粘贴
+                    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                    for (let index in items) {
+                        const item = items[index];
+                        if (item.kind === 'file') {
+                            const blob = item.getAsFile();
+                            processImageFile(blob);
+                        }
+                    }
+                }
+
+                function triggerModalUpload() { document.getElementById('modal-file-upload').click(); }
+                
+                function handleModalImageUpload(e) {
+                    const file = e.target.files[0];
+                    if (file) processImageFile(file);
+                }
+
+                function processImageFile(file) {
+                    if (!file.type.startsWith('image/')) return;
+                    modalData.value.imagePreviewUrl = URL.createObjectURL(file); // 供本地预览显示
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        modalData.value.imageBase64 = e.target.result; // 转为 base64 供 API 使用
+                    };
+                    reader.readAsDataURL(file);
+                }
+
+                async function runOCR() {
+                    if (!modalData.value.imageBase64) return;
+                    modalData.value.isProcessing = true;
+                    modalData.value.aiResult = "🚀 AI 正在努力识别中...\n如果公式较多可能需要十几秒，请耐心等待...";
+                    
+                    try {
+                        const payload = {
+                            model: "ecnu-max",
+                            messages: [
+                                { 
+                                    role: "system", 
+                                    content: "你是一个专业的数学和编程公式OCR助手。你的任务是把图片里的文字和公式无损提取为Markdown格式。数学公式请严格使用$包围(内联)或$$包围(块级)。不要输出任何废话，直接给出提取结果。" 
+                                },
+                                { 
+                                    role: "user", 
+                                    content: [
+                                        { type: "text", text: "请帮我提取这张题目图片的内容：" },
+                                        { type: "image_url", image_url: { url: modalData.value.imageBase64 } }
+                                    ]
+                                }
+                            ],
+                            stream: false
+                        };
+
+                        const response = await fetch(llmApiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmApiKey}` },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const data = await response.json();
+                        
+                        let text = data.choices[0].message.content;
+                        // 清除大模型可能带上的 markdown 代码块外壳
+                        text = text.replace(/```markdown/gi, '').replace(/```/g, '').trim();
+                        modalData.value.aiResult = text;
+                    } catch (error) {
+                        modalData.value.aiResult = `❌ 识别失败: ${error.message}\n请检查 API Key 或网络连通性。`;
+                    } finally {
+                        modalData.value.isProcessing = false;
+                    }
+                }
+
+                function applyAIText() {
+                    if (modalData.value.raw_md) {
+                        modalData.value.raw_md += '\n\n' + modalData.value.aiResult;
+                    } else {
+                        modalData.value.raw_md = modalData.value.aiResult;
+                    }
+                    debouncedRender();
+                }
+
+                async function confirmAddQuestion() {
+                    const maxOrder = currentQuestions.value.length > 0 ? Math.max(...currentQuestions.value.map(q => q.question_order)) : 0;
+                    const finalMd = modalData.value.raw_md || `${maxOrder + 1}. 新题目`;
+                    
+                    statusText.value = '⏳ 保存中...';
+                    const { error } = await supabaseClient.from('questions').insert({ 
+                        chapter_title: currentSelection.value, 
+                        question_order: maxOrder + 1, 
+                        raw_md: finalMd 
+                    });
+                    
+                    if (!error) {
+                        statusText.value = '✅ 云端数据同步成功';
+                        await loadData();
+                        showModal.value = false;
+                    } else {
+                        statusText.value = '❌ 保存失败';
+                        alert("保存失败: " + error.message);
+                    }
+                }
+
 
                 // 渲染与保存
                 function renderMarkdown(md) { return marked.parse(md); }
@@ -545,12 +732,14 @@
                 }
 
                 return {
-                    statusText, chapters, currentSelection, currentQuestions, selectSection,
+                    statusText, chapters, currentSelection, currentQuestions, selectSection, selectedCount, 
                     addChapter, addSection, deleteChapter, deleteSection, addQuestion, deleteQuestion,
                     renderMarkdown, debouncedRender, saveQuestion, triggerUpload, uploadImage, 
                     exportMarkdown, exportPDF,
                     isSidebarOpen, isPdfOpen, currentPdfUrl,
-                    sidebarWidth, pdfWidth, isResizing, resizeType, startResize
+                    sidebarWidth, pdfWidth, isResizing, resizeType, startResize,
+                    showModal, modalData, openAddModal, handleModalImageUpload, 
+                    triggerModalUpload, runOCR, applyAIText, confirmAddQuestion
                 };
             }
         }).mount('#app');
