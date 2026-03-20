@@ -528,6 +528,12 @@
                         <style>
                             body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; color: #333; }
                             @media print { body { padding: 0; max-width: 100%; } div { page-break-inside: avoid; } }
+                            
+                            /* === 新增：为导出的 PDF 补充表格样式 === */
+                            table { border-collapse: collapse; width: 100%; margin: 15px 0; background-color: #fff; }
+                            th, td { border: 1px solid #dfe2e5; padding: 10px 15px; text-align: center; }
+                            th { background-color: #f6f8fa; font-weight: 600; }
+                            tr:nth-child(2n) { background-color: #fbfbfc; }
                         </style>
                         <script>
                             window.MathJax = { tex: { inlineMath: [['\\\\(', '\\\\)'], ['$', '$']], displayMath: [['\\\\[', '\\\\]'], ['$$', '$$']] },
