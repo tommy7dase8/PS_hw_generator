@@ -57,7 +57,8 @@
         
         .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-toggle { background: transparent; border: 1px solid rgba(255,255,255,0.5); color: white; font-size: 16px; padding: 4px 10px; }
+        .btn-toggle { background: transparent; border: none; color: white; font-size: 16px; padding: 6px 12px; border-radius: 6px; transition: 0.2s; }
+        .btn-toggle:hover { background: rgba(255,255,255,0.15); }
         .btn-primary { background-color: #3498db; color: white; }
         .btn-edit { background-color: #f1c40f; color: #333; }
         .btn-danger { background-color: #e74c3c; color: white; }
@@ -206,7 +207,7 @@
                 <button class="btn btn-export" @click="exportMarkdown(false)">⬇️ 导出 MD (纯题)</button>
                 <button class="btn btn-pdf" @click="exportPDF(true)">🖨️ 导出 PDF (带答案)</button>
                 <button class="btn btn-pdf" @click="exportPDF(false)">🖨️ 导出 PDF (纯题)</button>
-                <button class="btn btn-toggle" @click="isPdfOpen = !isPdfOpen" :style="{ background: isPdfOpen ? '#34495e' : 'transparent' }">
+                <button class="btn btn-toggle" v-show="currentView === 'workspace'" @click="isPdfOpen = !isPdfOpen" :style="{ background: isPdfOpen ? '#34495e' : 'transparent' }">
                     📖 {{ isPdfOpen ? '关闭核对区' : '打开核对区' }}
                 </button>
             </div>
@@ -279,8 +280,8 @@
                     </div>
                     
                     <div v-for="chap in chapters" :key="chap.name" class="chapter-box">
-                        <div class="chapter-title">
-                            <span @click="toggleChapter(chap.name)">
+                        <div class="chapter-title" @click="toggleChapter(chap.name)">
+                            <span>
                                 {{ expandedChapters[chap.name] ? '📂' : '📁' }} {{ chap.name }}
                             </span>
                             <div>
