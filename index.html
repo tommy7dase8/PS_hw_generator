@@ -315,6 +315,7 @@
             setup() {
                 const supabaseUrl = '{{SUPABASE_URL}}';
                 const supabaseKey = '{{SUPABASE_KEY}}';
+                const supaJWTKey = '{{supaJWTKey}}';
                 // === 新增：LLM API 配置 ===
                 const llmApiKey = '{{LLM_API_KEY}}';
                 const llmApiUrl = '{{LLM_API_URL}}';
@@ -577,7 +578,7 @@
                         const response = await fetch(llmApiUrl, {
                             method: 'POST',
                             // headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmApiKey}` },
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` },
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supaJWTKey}` },
                             body: JSON.stringify(payload)
                         });
 
