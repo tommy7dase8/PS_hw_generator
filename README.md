@@ -21,6 +21,7 @@
 * 🖨️ **智能剥离导出**：支持勾选题目导出为 **Markdown** 或 **PDF**。导出时可自动识别以“解”或“证”开头的段落，自由选择导出“纯净习题版”或“完整解析版”。
 * 📖 **双屏参考核对**：右侧集成独立 PDF 预览面板，可根据当前题集自动映射并打开对应的本地/云端参考答案。
 * ⏱️ **无感历史备份**：利用数据库底层 Trigger（触发器）实现自动版本控制，哪怕修改覆盖无数次，也可通过云端历史表随时找回。
+* ✨ **AI 辅助 OCR 录题****：为了极大提升题目录入效率，本项目引入了基于大模型的 OCR 辅助录题功能。你可以直接将带有复杂数学公式的题目截图粘贴到系统中，AI 会自动将其转换为标准无损的 Markdown 和 LaTeX 公式代码。
 
 ## 🛠️ 技术栈
 
@@ -134,3 +135,91 @@ EXECUTE FUNCTION log_question_update();
     - Target roles: 点击下拉框，勾选 anon（代表允许匿名用户操作）
 
 7. 其它地方留空或者保持默认，直接点击右下角的 Review，然后点击 Save policy。
+
+## 调用API可能会出现的跨域 (CORS) 问题
+
+尝试直接从托管在 GitHub Pages 的纯前端页面发起对大模型 API 的 `fetch` 请求时，可能遭遇经典的浏览器的安全拦截 (F12控制台日志)：
+
+```
+已拦截跨源请求：同源策略禁止读取位于 https://xxx/chat/completions 的远程资源。（原因：CORS 请求未能成功 / 缺少 'Access-Control-Allow-Origin' 头）
+```
+
+**🔍 问题根本原因分析**
+
+**浏览器安全策略**：绝大多数官方的大模型 API 服务器出于防滥用目的，仅允许“服务器对服务器 (Server-to-Server)”的调用，拒绝来自不受信任的网页前端（Origin）的跨域请求。
+
+ **✅ 我的解决方案：Supabase Edge Functions 边缘代理**
+
+为了彻底解决跨域问题并保护 API Key，本项目利用现有的 Supabase 架构，部署了一个轻量级的 Serverless 边缘函数作为“中间人代理”。
+
+**数据流转逻辑：** `GitHub Pages 前端` ➡️ `携带 Supabase Token 发起请求` ➡️ `Supabase Edge Function (解包并拼装真实 API Key)` ➡️ `请求大模型 API` ➡️ `原路返回识别结果`
+
+1. 登录 Supabase 网页控制台，进入你的项目。
+2. 在左侧菜单找到并点击 **Edge Functions**。
+3. 进入 Edge Functions 页面后，在页面的顶部标签栏（Tabs）或者右上角，你会看到一个叫做 **“Secrets”** 的选项。
+4. 点击进入 Secrets 管理界面，选择 **Add new secret**。
+5. 填入你的大模型密钥：LLM_API_KEY 和 LLM_API_URL   然后点击保存。
+6. 回到 Edge Functions 的主列表页面，点击右上角的 **Create a new Edge Function**（或者点击 Deploy a new function -> Via Editor）。
+7. 在弹出的侧边栏或新窗口中，**Function name** 填 `ocr-proxy`。
+8. 此时会进入网页版的代码编辑器。把里面的默认代码全删了，粘贴下面的那段完整代码。
+9. 保持 JWT Verification 开启，点击创建。
+10. 点击右上角的 **Deploy**。
+11. 部署完成后，你会在这个函数的详情页看到一个类似于 `https://<你的项目ID>.supabase.co/functions/v1/ocr-proxy` 的 URL。复制它，替换github secret key里面的LLM_API_URL
+
+### 💻 核心代码存档
+
+我们在 Supabase 云端部署了以下通用代理脚本。该脚本依赖于云端配置的 `LLM_API_KEY` 和 `LLM_API_URL` 两个环境变量，实现了极佳的模型解耦，随时可以零代码切换底层大模型：
+
+```typescript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+Deno.serve(async (req) => {
+  // 1. 处理浏览器的 CORS 预检请求 (OPTIONS)
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    // 2. 从云端环境变量中读取 API Key 与目标接口地址（做到完全解耦，不限模型提供商）
+    const LLM_API_KEY = Deno.env.get('LLM_API_KEY')
+    if (!LLM_API_KEY) {
+      throw new Error("后端未配置 LLM_API_KEY")
+    }
+
+    const LLM_API_URL = Deno.env.get('LLM_API_URL')
+    if (!LLM_API_URL) {
+      throw new Error("后端未配置 LLM_API_URL")
+    }
+
+    // 3. 读取前端发来的标准请求体
+    const requestData = await req.json()
+
+    // 4. 携带真实凭证，在服务端安全转发请求给大模型
+    const response = await fetch(LLM_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LLM_API_KEY}`
+      },
+      body: JSON.stringify(requestData)
+    })
+
+    const data = await response.json()
+
+    // 5. 将大模型处理结果携同跨域允许头，安全返回给前端网页
+    return new Response(JSON.stringify(data), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    })
+  }
+})
+```
+
